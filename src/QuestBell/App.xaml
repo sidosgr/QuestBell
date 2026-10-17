@@ -1,0 +1,82 @@
+<Application x:Class="QuestBell.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" ShutdownMode="OnExplicitShutdown">
+  <Application.Resources>
+    <SolidColorBrush x:Key="TextBrush" Color="#EEF2F6"/>
+    <Style TargetType="Window"><Setter Property="Background" Value="#0D121B"/><Setter Property="Foreground" Value="#EEF2F6"/><Setter Property="FontFamily" Value="Segoe UI"/><Setter Property="FontSize" Value="14"/><Setter Property="UseLayoutRounding" Value="True"/></Style>
+    <Style TargetType="Button">
+      <Setter Property="Background" Value="#202A3B"/><Setter Property="Foreground" Value="#EEF2F6"/>
+      <Setter Property="Padding" Value="17,11"/><Setter Property="Margin" Value="0,0,8,8"/><Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="BorderThickness" Value="1"/><Setter Property="BorderBrush" Value="#344155"/><Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="9" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
+          <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True"/>
+        </Border><ControlTemplate.Triggers>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Opacity" Value="0.82"/></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="#BDAAFF"/><Setter TargetName="Bd" Property="BorderThickness" Value="2"/></Trigger>
+          <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Bd" Property="Opacity" Value="0.4"/></Trigger>
+        </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="TextBox"><Setter Property="Background" Value="#121B29"/><Setter Property="Foreground" Value="#EEF2F6"/><Setter Property="CaretBrush" Value="#65E5C4"/><Setter Property="BorderBrush" Value="#3A4960"/><Setter Property="Padding" Value="11,9"/><Setter Property="Margin" Value="0,0,8,10"/><Setter Property="MinHeight" Value="39"/><Setter Property="SelectionBrush" Value="#496E83"/></Style>
+    <Style TargetType="ComboBoxItem"><Setter Property="Foreground" Value="#EDF3F8"/><Setter Property="Padding" Value="11,9"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBoxItem"><Border x:Name="Item" Background="#172234" Padding="{TemplateBinding Padding}"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Item" Property="Background" Value="#2C4853"/></Trigger><Trigger Property="IsSelected" Value="True"><Setter TargetName="Item" Property="Background" Value="#29483F"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="ComboBox">
+      <Setter Property="MinHeight" Value="39"/><Setter Property="Padding" Value="9,7"/><Setter Property="Margin" Value="0,0,8,10"/><Setter Property="FontSize" Value="14"/>
+      <Setter Property="Foreground" Value="#EDF3F8"/><Setter Property="Background" Value="#121B29"/><Setter Property="BorderBrush" Value="#3A4960"/><Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox"><Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions>
+        <Border Grid.ColumnSpan="2" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="7"/>
+        <ContentPresenter x:Name="Selected" Content="{TemplateBinding SelectionBoxItem}" Margin="11,9,5,8" VerticalAlignment="Center" IsHitTestVisible="False"/>
+        <TextBox x:Name="PART_EditableTextBox" Visibility="Collapsed" Background="Transparent" Foreground="{TemplateBinding Foreground}" BorderThickness="0" Margin="2,0,0,0" Padding="9,8" MinHeight="0" VerticalContentAlignment="Center"/>
+        <ToggleButton x:Name="Drop" Grid.Column="1" Focusable="False" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+          <ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border Background="Transparent"><TextBlock Text="⌄" Foreground="#92A3B8" HorizontalAlignment="Right" Margin="0,0,11,0" VerticalAlignment="Center"/></Border></ControlTemplate></ToggleButton.Template>
+        </ToggleButton>
+        <Popup x:Name="PART_Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Fade">
+          <Border Background="#172234" BorderBrush="#40536B" BorderThickness="1" CornerRadius="6" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" MaxHeight="310">
+            <ScrollViewer CanContentScroll="True"><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer>
+          </Border>
+        </Popup>
+      </Grid><ControlTemplate.Triggers>
+        <Trigger Property="IsEditable" Value="True"><Setter TargetName="Selected" Property="Visibility" Value="Collapsed"/><Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible"/></Trigger>
+        <Trigger Property="IsEditable" Value="False"><Setter TargetName="Drop" Property="Grid.Column" Value="0"/><Setter TargetName="Drop" Property="Grid.ColumnSpan" Value="2"/></Trigger>
+        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger>
+        <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter Property="BorderBrush" Value="#BDAAFF"/></Trigger>
+      </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="CheckBox"><Setter Property="Foreground" Value="#D8E2ED"/><Setter Property="Margin" Value="0,5,10,12"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="FontSize" Value="14"/></Style>
+    <Style TargetType="DatePickerTextBox"><Setter Property="Background" Value="#121B29"/><Setter Property="Foreground" Value="#EDF3F8"/><Setter Property="CaretBrush" Value="#6BE8C5"/><Setter Property="Padding" Value="7"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="DatePickerTextBox"><Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}"><ScrollViewer x:Name="PART_ContentHost"/></Border></ControlTemplate></Setter.Value></Setter></Style>
+    <Style TargetType="DatePicker"><Setter Property="MinHeight" Value="39"/><Setter Property="Margin" Value="0,0,8,10"/><Setter Property="FontSize" Value="14"/><Setter Property="Background" Value="#121B29"/><Setter Property="Foreground" Value="#EDF3F8"/></Style>
+    <Style TargetType="Expander"><Setter Property="Foreground" Value="#C9D8E7"/><Setter Property="Margin" Value="0,8,0,12"/><Setter Property="Padding" Value="0,8"/></Style>
+    <Style TargetType="ScrollViewer"><Setter Property="VerticalScrollBarVisibility" Value="Auto"/><Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/></Style>
+    <Style TargetType="ScrollBar"><Setter Property="Width" Value="9"/><Setter Property="Background" Value="Transparent"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollBar"><Track x:Name="PART_Track" IsDirectionReversed="True"><Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0"/></Track.DecreaseRepeatButton><Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="#3A4C63" CornerRadius="5" Margin="1"/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb><Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0"/></Track.IncreaseRepeatButton></Track></ControlTemplate></Setter.Value></Setter></Style>
+    <Style TargetType="ToolTip"><Setter Property="Background" Value="#263246"/><Setter Property="Foreground" Value="#EEF2F6"/></Style>
+    <Style TargetType="ContextMenu">
+      <Setter Property="OverridesDefaultStyle" Value="True"/><Setter Property="Background" Value="#172234"/><Setter Property="Foreground" Value="#EDF3F8"/>
+      <Setter Property="BorderBrush" Value="#40536B"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Padding" Value="6"/><Setter Property="MinWidth" Value="230"/>
+      <Setter Property="FontFamily" Value="Segoe UI"/><Setter Property="FontSize" Value="14"/><Setter Property="UseLayoutRounding" Value="True"/><Setter Property="SnapsToDevicePixels" Value="True"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ContextMenu">
+        <!-- Own the complete popup surface: the default Windows template adds a light icon gutter. -->
+        <Border x:Name="MenuSurface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10" Padding="{TemplateBinding Padding}">
+          <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+        </Border>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="MenuItem">
+      <Setter Property="Foreground" Value="#EDF3F8"/><Setter Property="Background" Value="Transparent"/><Setter Property="Padding" Value="11,10"/><Setter Property="MinHeight" Value="42"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="MenuItem">
+        <Border x:Name="MenuBorder" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="1" Padding="{TemplateBinding Padding}" CornerRadius="6">
+          <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <ContentPresenter x:Name="IconPresenter" ContentSource="Icon" Width="20" Height="20" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+            <ContentPresenter x:Name="HeaderPresenter" Grid.Column="1" ContentSource="Header" Margin="12,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True"/>
+          </Grid>
+        </Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="MenuBorder" Property="Background" Value="#2C4853"/></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="MenuBorder" Property="BorderBrush" Value="#BDAAFF"/></Trigger>
+          <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+  </Application.Resources>
+</Application>

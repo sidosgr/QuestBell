@@ -1,0 +1,92 @@
+using QuestBell.Core;
+using System.Text.Json;
+
+internal static class CloudTests
+{
+    internal static void Run(Action<string, bool> check)
+    {
+        const string a = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", b = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        var when = DateTime.Today.AddDays(5).AddHours(9);
+        Reminder Reminder(string title) => new() { Title = title, CustomTitle = true, NextAt = when, AnchorAt = when, OccurrenceAt = when };
+        var left = new AppData { Reminders = [Reminder("Phone bill")] };
+        var seed = CloudSync.Capture(left, a); left = CloudSync.Apply(left, seed);
+        var right = CloudSync.Apply(new AppData(), seed);
+        check("Cloud initial join imports reminders", right.Reminders.Single().Id == left.Reminders.Single().Id);
+        right.Settings.Language = "el"; right.Settings.AutoStart = false; right.Settings.Monitor = "all";
+        left.Reminders.Add(Reminder("Rent")); right.Reminders.Add(Reminder("Subscription"));
+        var ld = CloudSync.Capture(left, a); var rd = CloudSync.Capture(right, b);
+        var merge = CloudSync.Merge(ld, rd);
+        left = CloudSync.Apply(left, merge); right = CloudSync.Apply(right, CloudSync.Merge(rd, ld));
+        check("Cloud offline additions from both PCs survive", left.Reminders.Count == 3 && right.Reminders.Count == 3);
+        check("Cloud merge order converges", CloudSync.ContentFingerprint(left) == CloudSync.ContentFingerprint(right));
+        check("Cloud preferences stay on each PC", left.Settings.Language == "en" && right.Settings.Language == "el" && !right.Settings.AutoStart && right.Settings.Monitor == "all");
+        var phoneId = seed.Entries.Keys.Single()[2..];
+        left.Reminders.Single(x => x.Id == phoneId).Title = "Phone edited on A";
+        right.Reminders.Single(x => x.Id == phoneId).Title = "Phone edited on B";
+        ld = CloudSync.Capture(left, a); rd = CloudSync.Capture(right, b);
+        var conflicts = CloudSync.Merge(ld, rd);
+        check("Cloud concurrent edits choose a deterministic version", CloudSync.Apply(left, conflicts).Reminders.Single(x => x.Id == phoneId).Title == "Phone edited on B");
+        check("Cloud conflicting merge is commutative", JsonSerializer.Serialize(CloudSync.Merge(rd, ld)) == JsonSerializer.Serialize(conflicts));
+        left = CloudSync.Apply(left, conflicts); right = CloudSync.Apply(right, conflicts);
+        left.Reminders.Single(x => x.Id == phoneId).Title = "Follow-up edit";
+        merge = CloudSync.Merge(CloudSync.Capture(left, a), CloudSync.Capture(right, b));
+        right = CloudSync.Apply(right, merge); left = CloudSync.Apply(left, merge);
+        check("Cloud later observed edit wins independently of wall clock", right.Reminders.Single(x => x.Id == phoneId).Title == "Follow-up edit");
+        left.Reminders.RemoveAll(x => x.Id == phoneId);
+        merge = CloudSync.Merge(CloudSync.Capture(left, a), CloudSync.Capture(right, b));
+        right = CloudSync.Apply(right, merge); left = CloudSync.Apply(left, merge);
+        check("Cloud deletion propagates", right.Reminders.Count == 2 && right.Reminders.All(x => x.Id != phoneId));
+        check("Cloud stale device cannot resurrect deleted reminder", CloudSync.Apply(right, CloudSync.Merge(merge, seed)).Reminders.All(x => x.Id != phoneId));
+        var done = left.Reminders[0]; left.Resolve(done, "done", when);
+        merge = CloudSync.Merge(CloudSync.Capture(left, a), CloudSync.Capture(right, b));
+        left = CloudSync.Apply(left, merge); right = CloudSync.Apply(right, merge);
+        check("Cloud completion and history propagate", right.Reminders.Single(x => x.Id == done.Id).Finished && right.History.Count == 1);
+        check("Cloud undo after sync works", right.Undo(right.History[0]));
+        merge = CloudSync.Merge(CloudSync.Capture(left, a), CloudSync.Capture(right, b));
+        left = CloudSync.Apply(left, merge); right = CloudSync.Apply(right, merge);
+        check("Cloud undo propagates", !left.Reminders.Single(x => x.Id == done.Id).Finished && left.History[0].Undone);
+        var snooze = left.Reminders.Single(x => x.Id == done.Id); snooze.NextAt = when.AddHours(3); snooze.Snoozed = true; snooze.Revision++;
+        left.CustomPhrases["subject"].Add("τηλέφωνο εργασίας");
+        merge = CloudSync.Merge(CloudSync.Capture(left, a), CloudSync.Capture(right, b));
+        right = CloudSync.Apply(right, merge); left = CloudSync.Apply(left, merge);
+        check("Cloud snooze and Greek custom phrases propagate", right.Reminders.Single(x => x.Id == done.Id).NextAt == when.AddHours(3) && right.Reminders.Single(x => x.Id == done.Id).Snoozed && right.CustomPhrases["subject"].Contains("τηλέφωνο εργασίας"));
+        right.CustomPhrases["subject"].Clear();
+        merge = CloudSync.Merge(CloudSync.Capture(left, a), CloudSync.Capture(right, b));
+        left = CloudSync.Apply(left, merge); right = CloudSync.Apply(right, merge);
+        check("Cloud phrase deletion propagates", left.CustomPhrases["subject"].Count == 0);
+        var beforeArt = JsonSerializer.Serialize(CloudSync.Capture(left, a));
+        left.Reminders[0].LastArtVariant = 5;
+        check("Cloud local artwork rotation creates no update", beforeArt == JsonSerializer.Serialize(CloudSync.Capture(left, a)));
+        right.Reminders[0].ArtVariant = 5; right.Reminders[0].PinArt = true;
+        merge = CloudSync.Merge(CloudSync.Capture(left, a), CloudSync.Capture(right, b));
+        left = CloudSync.Apply(left, merge);
+        check("Cloud pinned artwork propagates", left.Reminders[0].PinArt && left.Reminders[0].ArtVariant == 5);
+        var folder = Path.Combine(Path.GetTempPath(), "QuestBell-cloud-tests-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(folder);
+        var store = new Store(Path.Combine(folder, "local")); store.Save(left);
+        check("Cloud metadata and reminders persist together", JsonSerializer.Serialize(store.Load().SyncState) == JsonSerializer.Serialize(left.SyncState));
+        string backup = CloudSync.WriteBackup(Path.Combine(folder, "backups"), a, left);
+        var restored = Store.Read(backup);
+        check("Cloud backup is a portable readable restore file", restored.SyncState is null && restored.Reminders.Count == left.Reminders.Count && restored.Settings.Language == left.Settings.Language);
+        for (int i = 0; i < 32; i++) CloudSync.WriteBackup(Path.Combine(folder, "backups"), a, left);
+        CloudSync.WriteBackup(Path.Combine(folder, "backups"), b, right);
+        check("Cloud backup retention is 30 per device", Directory.GetFiles(Path.Combine(folder, "backups"), a + "-*.json").Length == 30 && Directory.GetFiles(Path.Combine(folder, "backups"), b + "-*.json").Length == 1);
+        CloudSync.WriteAtomic(Path.Combine(folder, "device.json"), merge);
+        check("Cloud document round trip", CloudSync.Apply(left, CloudSync.Read(Path.Combine(folder, "device.json"))).Reminders.Count == left.Reminders.Count);
+        bool Reject(Action action) { try { action(); return false; } catch (Exception e) when (e is InvalidDataException or JsonException) { return true; } }
+        File.WriteAllText(Path.Combine(folder, "broken.json"), "{broken");
+        check("Cloud incomplete downloads are rejected", Reject(() => CloudSync.Read(Path.Combine(folder, "broken.json"))));
+        check("Cloud future schema is rejected", Reject(() => CloudSync.Validate(new SyncDocument { Version = 100 })));
+        check("Cloud malformed records are rejected", Reject(() => CloudSync.Validate(new SyncDocument { Entries = new() { ["r:test"] = new() { Device = a, Counter = 1, Value = "null" } } })));
+        var malformed = JsonSerializer.Deserialize<SyncDocument>(JsonSerializer.Serialize(merge))!;
+        malformed.Entries.First().Value.Value = "{}";
+        check("Cloud unsafe payload is rejected", Reject(() => CloudSync.Validate(malformed)));
+        check("Cloud tombstones remain after multiple merges", CloudSync.Merge(merge, merge).Entries["r:" + phoneId].Value is null);
+        var work = new Reminder { IsWork = true, WorkTemplateId = "ship-order", WorkReference = "#204", Title = "Ship order · #204", NextAt = when, AnchorAt = when, OccurrenceAt = when };
+        left.Reminders.Add(work); left.Settings.WorkMode = true;
+        var workDoc = CloudSync.Capture(left, a);
+        check("Work sync advertises the new format to prevent older peers stripping fields", workDoc.Version == 2 && CloudSync.Merge(seed, workDoc).Version == 2);
+        var workPeer = CloudSync.Apply(new AppData(), workDoc);
+        check("Work metadata syncs while default mode stays local", workPeer.Reminders.Single(x => x.Id == work.Id).WorkReference == "#204" && !workPeer.Settings.WorkMode);
+        check("Work backup round trip retains template and reference", CloudSync.Backup(left).Reminders.Single(x => x.Id == work.Id).WorkTemplateId == "ship-order");
+    }
+}
