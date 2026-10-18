@@ -3,7 +3,7 @@
     <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><Nullable>enable</Nullable>
     <AssemblyName>QuestBell</AssemblyName><RootNamespace>QuestBell</RootNamespace>
-    <Version>1.4.0</Version><ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>1.5.0</Version><ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets/questbell.ico</ApplicationIcon><EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../QuestBell.Core/QuestBell.Core.csproj" /></ItemGroup>

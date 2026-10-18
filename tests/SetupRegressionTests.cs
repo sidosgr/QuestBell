@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -38,6 +39,17 @@ internal static class SetupRegressionTests
             Install(target,context,log);
             Check("Upgrade replaces app files and keeps existing reminder data", File.ReadAllText(Path.Combine(target,"QuestBell.exe")) == "updated version" && File.ReadAllText(data) == "existing reminders must stay unchanged");
             Check("Successful upgrade removes previous-version staging folder", Directory.GetDirectories(Path.GetDirectoryName(target),"QuestBell.previous-*").Length == 0);
+            Program.Greek = true;
+            SetupWorker.Run(delegate { Program.Install(target,false,false,true,delegate { },context,log); }).GetAwaiter().GetResult();
+            using (var key = Registry.CurrentUser.OpenSubKey(context.StartupRegistryPath)) Check("Update preserves disabled startup choice in isolated registry", key != null && key.GetValue(context.StartupValueName) == null);
+            Check("Update records selected Greek installer language", File.ReadAllLines(Path.Combine(target,"questbell.install")).Last() == "el");
+            Check("Update does not replace existing reminder preferences", File.ReadAllText(data) == "existing reminders must stay unchanged");
+            using (var form = new SetupForm(target,true,false,false))
+            {
+                var choices = form.Controls.OfType<System.Windows.Forms.CheckBox>().ToArray();
+                Check("Update form keeps restart enabled and startup preference fixed", choices.Length == 2 && choices[0].Checked && !choices[1].Checked && choices.All(c => !c.Enabled));
+            }
+            Program.Greek = false;
 
             context = Scenario("desktop denied",out target,out log);
             context.BeforeOptionalStep = delegate(string step) { if (step == "desktop shortcut") throw new TargetInvocationException(new UnauthorizedAccessException("Simulated redirected Desktop access denied")); };

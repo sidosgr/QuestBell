@@ -108,4 +108,5 @@ Check("Old personal artwork IDs remain stable", Artwork.Get("personal", 51).En =
 foreach (var (text, topic) in new[] { ("Email the client", "email"), ("Ship order for client", "shipping"), ("Write blog post", "blog"), ("Weekly newsletter", "newsletter"), ("Social media post", "social"), ("Order supplies", "office"), ("Στείλε την παραγγελία", "shipping"), ("Στείλε email στον πελάτη", "email"), ("Γράψε άρθρο", "blog"), ("Ανάρτηση στα κοινωνικά δίκτυα", "social") })
     Check("Custom work artwork: " + text, Artwork.Topic(new Reminder { IsWork = true, CustomTitle = true, Title = text }) == "work-" + topic);
 Check("Weekly newsletter defaults to weekly", WorkCatalog.Find("weekly-newsletter")!.Repeat == "weekly");
+UpdateDownloadTests.Run(Check);
 Console.WriteLine($"\n{passed} checks passed.");

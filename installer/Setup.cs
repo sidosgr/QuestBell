@@ -14,8 +14,8 @@ using Microsoft.Win32;
 
 [assembly: AssemblyTitle("QuestBell Setup")]
 [assembly: AssemblyDescription("QuestBell offline per-user Windows installer")]
-[assembly: AssemblyVersion("1.4.0.0")]
-[assembly: AssemblyFileVersion("1.4.0.0")]
+[assembly: AssemblyVersion("1.5.0.0")]
+[assembly: AssemblyFileVersion("1.5.0.0")]
 
 internal static class Program
 {
@@ -62,7 +62,11 @@ internal static class Program
             foreach (string arg in args) if (arg.StartsWith("/dir=", StringComparison.OrdinalIgnoreCase)) target = Path.GetFullPath(arg.Substring(5));
             if (args.Contains("/silent"))
             { Install(target, false, false, !args.Contains("/no-register"), delegate(int p, string s) { }); return 0; }
-            using (var form = new SetupForm(target)) Application.Run(form);
+            bool update = args.Contains("/update");
+            if (update) ValidateInstalled(target);
+            Greek = args.Contains("/greek");
+            using (var form = new SetupForm(target, update, !args.Contains("/autostart=0"), !args.Contains("/no-register")))
+            { Application.Run(form); if (update && !form.Succeeded) return 1; }
             return 0;
 #endif
         }
@@ -158,7 +162,7 @@ internal static class Program
         {
             using (RegistryKey key = Registry.CurrentUser.CreateSubKey(context.UninstallRegistryPath))
             {
-                key.SetValue("DisplayName", "QuestBell"); key.SetValue("DisplayVersion", "1.4.0"); key.SetValue("Publisher", "QuestBell");
+                key.SetValue("DisplayName", "QuestBell"); key.SetValue("DisplayVersion", "1.5.0"); key.SetValue("Publisher", "QuestBell");
                 key.SetValue("InstallLocation", target); key.SetValue("DisplayIcon", Path.Combine(target, "QuestBell.exe"));
                 key.SetValue("UninstallString", "\"" + Path.Combine(target, "QuestBell.Uninstall.exe") + "\"");
                 key.SetValue("QuietUninstallString", "\"" + Path.Combine(target, "QuestBell.Uninstall.exe") + "\" /silent");
@@ -241,14 +245,17 @@ internal sealed class SetupForm : Form
     [System.Runtime.InteropServices.DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr h, int a, ref int v, int size);
     protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); int dark = 1; DwmSetWindowAttribute(Handle,20,ref dark,4); }
     private readonly string target;
+    private readonly bool updateMode, register;
+    internal bool Succeeded { get { return finished; } }
     private Label heading, description, status, features, pathLabel;
     private Button install, en, el;
     private CheckBox run, startup;
     private ProgressBar progress;
     private LinkLabel details;
     private bool busy, finished;
-    internal SetupForm(string target)
+    internal SetupForm(string target, bool updateMode = false, bool autoStart = true, bool register = true)
     {
+        this.updateMode = updateMode; this.register = register;
         this.target = target; Text = "QuestBell · Setup / Εγκατάσταση"; ClientSize = new Size(690, 530); FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false; StartPosition = FormStartPosition.CenterScreen; BackColor = Color.FromArgb(13,18,27); ForeColor = Color.FromArgb(238,244,248); Font = new Font("Segoe UI", 10);
         using (Stream icon = Assembly.GetExecutingAssembly().GetManifestResourceStream("questbell.ico")) if (icon != null) Icon = new Icon(icon);
@@ -270,6 +277,7 @@ internal sealed class SetupForm : Form
         pathLabel = LabelAt(new Point(35,295), new Size(620,40), 9, false); pathLabel.ForeColor = Color.FromArgb(146,163,184);
         run = new CheckBox { Checked = true, Location = new Point(35,350), Size = new Size(610,25), ForeColor = ForeColor, FlatStyle = FlatStyle.Flat }; Controls.Add(run);
         startup = new CheckBox { Checked = true, Location = new Point(35,379), Size = new Size(610,25), ForeColor = ForeColor, FlatStyle = FlatStyle.Flat }; Controls.Add(startup);
+        if (updateMode) { startup.Checked = autoStart; run.Enabled = startup.Enabled = false; }
         progress = new ProgressBar { Location = new Point(35,422), Size = new Size(620,6), Style = ProgressBarStyle.Continuous }; Controls.Add(progress);
         status = LabelAt(new Point(35,449), new Size(400,35), 9, false); status.ForeColor = Color.FromArgb(146,163,184);
         details = new LinkLabel { Location = new Point(35,490), Size = new Size(400,22), LinkColor = Color.FromArgb(118,237,200), ActiveLinkColor = Color.FromArgb(189,170,255), VisitedLinkColor = Color.FromArgb(118,237,200), Visible = false };
@@ -278,6 +286,7 @@ internal sealed class SetupForm : Form
         install.Font = new Font("Segoe UI", 11, FontStyle.Bold); install.Click += async delegate { await BeginInstall(); };
         FormClosing += delegate(object sender, FormClosingEventArgs e) { if (busy) e.Cancel = true; };
         Translate();
+        if (updateMode) Shown += async delegate { if (!RenderOnly) await BeginInstall(); };
     }
     private Label LabelAt(Point p, Size size, int points, bool bold)
     { var label = new Label { Location = p, Size = size, Font = new Font("Segoe UI", points, bold ? FontStyle.Bold : FontStyle.Regular), ForeColor = ForeColor }; Controls.Add(label); return label; }
@@ -287,7 +296,8 @@ internal sealed class SetupForm : Form
     {
         heading.Text = Program.T("Small quests. Lighter days.", "Μικρές αποστολές.\nΠιο ανάλαφρες μέρες.");
         description.Text = Program.T("A little magic for bills, subscriptions and everything you mean to remember.", "Λίγη μαγεία για λογαριασμούς, συνδρομές και όσα θέλεις να θυμάσαι.");
-        features.Text = Program.T("76 pixel-art illustrations   ·   English + Greek   ·   Fully offline", "76 εικόνες pixel art   ·   Ελληνικά + Αγγλικά   ·   Εκτός σύνδεσης");
+        features.Text = Program.T("100 pixel-art illustrations   ·   English + Greek   ·   Offline reminders", "100 εικόνες pixel art   ·   Ελληνικά + Αγγλικά   ·   Υπενθυμίσεις εκτός σύνδεσης");
+        if (updateMode) { heading.Text = Program.T("A little upgrade is on its way.", "Έρχεται μια μικρή αναβάθμιση."); description.Text = Program.T("Updating QuestBell. Your reminders and settings stay with you.", "Ενημέρωση QuestBell. Οι υπενθυμίσεις και οι ρυθμίσεις διατηρούνται."); }
         pathLabel.Text = Program.T("Installs for your Windows user. No administrator required.\n", "Εγκατάσταση για τον χρήστη σου. Δεν απαιτείται διαχειριστής.\n") + target;
         run.Text = Program.T("Open QuestBell when setup finishes", "Άνοιγμα QuestBell μετά την εγκατάσταση"); startup.Text = Program.T("Start quietly with Windows", "Διακριτική εκκίνηση με τα Windows");
         install.Text = finished ? Program.T("All set! Close", "Έτοιμο! Κλείσιμο") : Program.T("Install QuestBell  ✦", "Εγκατάσταση  ✦");
@@ -297,19 +307,21 @@ internal sealed class SetupForm : Form
     private async Task BeginInstall()
     {
         if (finished) { Close(); return; } if (busy) return;
-        bool launch = run.Checked, autoStart = startup.Checked; busy = true; install.Enabled = en.Enabled = el.Enabled = run.Enabled = startup.Enabled = false;
+        bool launch = run.Checked && register, autoStart = startup.Checked; busy = true; install.Enabled = en.Enabled = el.Enabled = run.Enabled = startup.Enabled = false;
         try
         {
-            await SetupWorker.Run(delegate { Program.Install(target, false, autoStart, true, delegate(int percent, string text) { BeginInvoke((Action)delegate { progress.Value = Math.Min(100,percent); status.Text = text; }); }); });
+            await SetupWorker.Run(delegate { Program.Install(target, false, autoStart, register, delegate(int percent, string text) { BeginInvoke((Action)delegate { progress.Value = Math.Min(100,percent); status.Text = text; }); }); });
             finished = true; busy = false; Translate(); install.Enabled = true;
             if (launch) Program.Optional(new SetupContext(), Program.Diagnostics, "launch", delegate { Process.Start(Path.Combine(target, "QuestBell.exe")); });
             details.Visible = Program.Diagnostics.Warnings.Count > 0;
             Translate();
+            if (updateMode && Program.Diagnostics.Warnings.Count == 0) Close();
         }
         catch (Exception error)
         {
             Program.Diagnostics.Failure(error);
             busy = false; install.Enabled = en.Enabled = el.Enabled = run.Enabled = startup.Enabled = true;
+            if (updateMode) run.Enabled = startup.Enabled = false;
             status.Text = Program.T("Setup stopped. See details below.", "Η εγκατάσταση σταμάτησε. Δες τις λεπτομέρειες.");
             details.Visible = true; Program.ShowFailure(this, error);
         }

@@ -1,5 +1,11 @@
 # Changes
 
+## 1.5.0
+
+- Added Update now in Settings and the update banner: download directly from GitHub, verify size and SHA-256, install, and reopen QuestBell.
+- Added download progress, cancellation, safe retry, bounded trusted redirects and cleanup of partial/stale downloads. Unverifiable installers cannot run.
+- Added installer update mode with automatic progress and restart, preserving reminder data, language and the user's Windows startup choice.
+- Updated English/Greek controls, guide and download, installer and UI regression coverage.
 ## 1.4.0
 
 - Added Settings → Your quick choices to add/remove reusable custom reminders with Personal/Work mode, an artwork family and a default repeat. They appear in step 1 of the reminder wizard; created reminders remain independent of their shortcut.

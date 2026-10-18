@@ -5,7 +5,7 @@ $taskTestRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('QuestBell-install-
 $taskInstallPath = Join-Path $taskTestRoot 'QuestBell'
 $taskDataPath = Join-Path $taskTestRoot 'data'
 New-Item -ItemType Directory -Force -Path $taskTestRoot | Out-Null
-$taskInstallerPath = Join-Path $taskRoot 'artifacts/QuestBell-Setup-1.4.0.exe'
+$taskInstallerPath = Join-Path $taskRoot 'artifacts/QuestBell-Setup-1.5.0.exe'
 $taskArguments = @('/silent','/no-register',('/dir="' + $taskInstallPath + '"'))
 $taskSetup = Start-Process -FilePath $taskInstallerPath -ArgumentList $taskArguments -PassThru -Wait -WindowStyle Hidden
 if ($taskSetup.ExitCode -ne 0) { throw 'Isolated installation failed. See %TEMP%/QuestBell-setup-error.txt.' }
@@ -14,6 +14,12 @@ if ($taskApp.ExitCode -ne 0) { throw 'Installed app smoke test failed.' }
 Copy-Item -LiteralPath (Join-Path $taskDataPath 'smoke-report.json') -Destination 'artifacts/installed-app-report.json'
 $taskUpgrade = Start-Process -FilePath $taskInstallerPath -ArgumentList $taskArguments -PassThru -Wait -WindowStyle Hidden
 if ($taskUpgrade.ExitCode -ne 0) { throw 'Isolated upgrade failed.' }
+$taskBeforeUpdate = Get-FileHash -LiteralPath (Join-Path $taskDataPath 'questbell.json') -Algorithm SHA256
+$taskDirectUpdate = Start-Process -FilePath $taskInstallerPath -ArgumentList @('/update','/autostart=0','/greek','/no-register',('/dir="' + $taskInstallPath + '"')) -PassThru -WindowStyle Hidden
+if (!$taskDirectUpdate.WaitForExit(120000)) { throw 'Direct-update installer did not finish.' }
+$taskDirectUpdate.Refresh()
+if ($taskDirectUpdate.ExitCode -ne 0) { throw 'Direct-update installation failed.' }
+if ((Get-FileHash -LiteralPath (Join-Path $taskDataPath 'questbell.json') -Algorithm SHA256).Hash -ne $taskBeforeUpdate.Hash) { throw 'Direct update changed saved reminders.' }
 $taskUninstall = Start-Process -FilePath (Join-Path $taskInstallPath 'QuestBell.Uninstall.exe') -ArgumentList @('/silent','/no-register') -PassThru -Wait -WindowStyle Hidden
 for ($taskAttempt=0; $taskAttempt -lt 30 -and (Test-Path -LiteralPath $taskInstallPath); $taskAttempt++) { Start-Sleep -Milliseconds 300 }
 $taskReport = [ordered]@{
@@ -22,6 +28,8 @@ $taskReport = [ordered]@{
     InstallExitCode=$taskSetup.ExitCode
     AppExitCode=$taskApp.ExitCode
     UpgradeExitCode=$taskUpgrade.ExitCode
+    DirectUpdateExitCode=$taskDirectUpdate.ExitCode
+    DirectUpdateDataUnchanged=$true
     UninstallExitCode=$taskUninstall.ExitCode
     InstallFolderRemoved=(!(Test-Path -LiteralPath $taskInstallPath))
     DataPreserved=(Test-Path -LiteralPath (Join-Path $taskDataPath 'questbell.json'))

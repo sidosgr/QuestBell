@@ -4,7 +4,11 @@ using System.Text.RegularExpressions;
 
 namespace QuestBell.Core;
 
-public record UpdateRelease(Version Version, string Page, string? Installer);
+public record UpdateRelease(Version Version, string Page, string? Installer, long Size = 0, string? Sha256 = null)
+{
+    public bool CanInstall => Installer is not null && Size > 0 && Size <= UpdateDownload.MaximumSize &&
+        Sha256 is not null && Regex.IsMatch(Sha256, "^[a-fA-F0-9]{64}$");
+}
 public static class GitHubUpdates
 {
     public const string Repository = "https://github.com/sidosgr/QuestBell";
@@ -27,16 +31,21 @@ public static class GitHubUpdates
         string expected = Repository + "/releases/tag/" + Uri.EscapeDataString(tag!);
         string? page = root.GetProperty("html_url").GetString();
         if (!string.Equals(page, expected, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Unexpected release destination.");
-        string? installer = null;
+        string? installer = null, digest = null; long size = 0;
         string name = "QuestBell-Setup-" + version.ToString(version.Revision == 0 ? 3 : 4) + ".exe";
         if (root.TryGetProperty("assets", out var assets))
         foreach (var asset in assets.EnumerateArray())
         {
             if (asset.GetProperty("name").GetString() != name) continue;
             string url = Repository + "/releases/download/" + Uri.EscapeDataString(tag!) + "/" + name;
-            if (string.Equals(asset.GetProperty("browser_download_url").GetString(), url, StringComparison.OrdinalIgnoreCase) && asset.GetProperty("state").GetString() == "uploaded") installer = url;
+            if (string.Equals(asset.GetProperty("browser_download_url").GetString(), url, StringComparison.OrdinalIgnoreCase) && asset.GetProperty("state").GetString() == "uploaded")
+            {
+                installer = url;
+                if (asset.TryGetProperty("size", out var bytes) && bytes.TryGetInt64(out var length)) size = length;
+                if (asset.TryGetProperty("digest", out var hash) && hash.ValueKind == JsonValueKind.String && hash.GetString() is string value && value.StartsWith("sha256:", StringComparison.Ordinal)) digest = value[7..];
+            }
         }
-        return new UpdateRelease(version, page!, installer);
+        return new UpdateRelease(version, page!, installer, size, digest);
     }
     public static async Task<(bool Unpublished, UpdateRelease? Release)> Check(HttpClient client, Version installed, CancellationToken cancellationToken = default)
     {

@@ -24,7 +24,7 @@ internal static class RenderTests
                 app.Data.Reminders[1].LastArtVariant = 21;
                 app.Data.Reminders[2].LastArtVariant = 41;
                 int artworkChecks = CheckArtwork(path);
-                int cloudChecks = await CloudServiceTests.Run(app);
+                int cloudChecks = await CloudServiceTests.Run(app); int updateChecks = 0;
                 app.Manager = new MainWindow();
                 int themeChecks = 0, menuChecks = 0, composerChecks = 0, workChecks = 0, quickChecks = 0;
                 void CheckWindow(Window window, double preferredWidth, double preferredHeight)
@@ -43,7 +43,7 @@ internal static class RenderTests
                 var snooze = new SnoozeWindow(); CheckWindow(snooze, 650, 760);
                 foreach (var lang in new[] { "en", "el" })
                 {
-                    L.Language = app.Data.Settings.Language = lang;
+                    L.Language = app.Data.Settings.Language = lang; updateChecks += CheckUpdateControls(app, lang, path);
                     artworkChecks += CheckComposerArtwork(lang);
                     composerChecks += CheckSimpleComposer(app, lang, path);
                     workChecks += CheckWorkComposer(app, lang, path);
@@ -64,7 +64,7 @@ internal static class RenderTests
                 if (!app.Data.Undo(entry)) throw new Exception("Undo flow failed.");
                 await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 var process = System.Diagnostics.Process.GetCurrentProcess(); process.Refresh();
-                var report = new { Result = "PASS", Screenshots = 42, QuickChoicesChecks = quickChecks, WorkChecks = workChecks, CloudChecks = cloudChecks, ComposerChecks = composerChecks, ArtworkChecks = artworkChecks, ArtworkCount = Artwork.Total, MenuLayoutAndContrastChecks = menuChecks, WindowThemeAndSizingChecks = themeChecks, Languages = new[] { "en", "el" }, PersistedReminders = loaded.Reminders.Count, WorkingSetMB = process.WorkingSet64 / 1048576.0, ManagedMB = GC.GetTotalMemory(false) / 1048576.0, Time = DateTime.Now };
+                var report = new { Result = "PASS", Screenshots = 46, UpdateChecks = updateChecks, QuickChoicesChecks = quickChecks, WorkChecks = workChecks, CloudChecks = cloudChecks, ComposerChecks = composerChecks, ArtworkChecks = artworkChecks, ArtworkCount = Artwork.Total, MenuLayoutAndContrastChecks = menuChecks, WindowThemeAndSizingChecks = themeChecks, Languages = new[] { "en", "el" }, PersistedReminders = loaded.Reminders.Count, WorkingSetMB = process.WorkingSet64 / 1048576.0, ManagedMB = GC.GetTotalMemory(false) / 1048576.0, Time = DateTime.Now };
                 File.WriteAllText(Path.Combine(app.Storage.DirectoryPath, "smoke-report.json"), JsonSerializer.Serialize(report, Store.Json));
                 app.Shutdown(0);
             }
@@ -371,6 +371,40 @@ internal static class RenderTests
             variant.SelectedItem = relatedPet.Label(language); CheckPreview(relatedPet);
             variant.SelectedIndex = 0; CheckPreview(expected);
         }
+        return checks;
+    }
+    private static int CheckUpdateControls(App app, string language, string path)
+    {
+        var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        void Property(string name, object? value) => typeof(UpdateService).GetProperty(name, flags)!.SetValue(app.Updates, value);
+        void Field(string name, object? value) => typeof(UpdateService).GetField(name, flags)!.SetValue(app.Updates, value);
+        T Control<T>(string name) => (T)typeof(MainWindow).GetField(name, flags)!.GetValue(app.Manager)!;
+        void Refresh() => typeof(MainWindow).GetMethod("RefreshUpdates", flags)!.Invoke(app.Manager, null);
+        int checks = 0;
+        void Check(bool condition, string message) { if (!condition) throw new Exception("Updates: " + message + "/" + language); checks++; }
+        var release = new UpdateRelease(new Version(9, 0, 0, 0), GitHubUpdates.Repository + "/releases/tag/v9.0.0", GitHubUpdates.Repository + "/releases/download/v9.0.0/QuestBell-Setup-9.0.0.exe", 100, new string('a', 64));
+        using var cancellation = new CancellationTokenSource();
+        try
+        {
+            Property("Available", release); Field("state", "available");
+            app.Manager!.Navigate("settings");
+            Check(Control<Button>("updateInstall").IsEnabled && Control<Button>("updateInstall").Visibility == Visibility.Visible, "settings offers verified update");
+            Check(Control<Button>("updateInstall").Content.ToString() == L.T("Update now", "Ενημέρωση τώρα"), "localized install action");
+            app.Manager.Navigate("tasks"); Render(app.Manager, Path.Combine(path, "update-ready-" + language + ".png"), 1440, 940);
+            Check(Control<Button>("bannerInstall").Visibility == Visibility.Visible, "dashboard offers direct update");
+            Property("Busy", true); Property("Percent", 40); Field("download", cancellation); Field("state", "downloading"); Refresh();
+            Check(!Control<Button>("bannerInstall").IsEnabled && Control<Button>("bannerCancel").Visibility == Visibility.Visible && app.Updates.Status.Contains("40%"), "download progress disables duplicate install and offers cancel");
+            Render(app.Manager, Path.Combine(path, "update-progress-" + language + ".png"), 1440, 940);
+            Control<Button>("bannerCancel").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(cancellation.IsCancellationRequested, "cancel action reaches active transfer");
+            Field("download", null); Field("state", "installing"); Refresh();
+            Check(Control<Button>("bannerCancel").Visibility == Visibility.Collapsed && !Control<Button>("bannerInstall").IsEnabled, "installer handoff cannot be cancelled or duplicated");
+            Property("Busy", false); Field("state", "install-error"); Refresh();
+            Check(Control<Button>("bannerInstall").IsEnabled, "failure can be retried");
+            Property("Available", release with { Sha256 = null }); Refresh();
+            Check(Control<Button>("bannerInstall").Visibility == Visibility.Collapsed, "unverifiable release cannot install");
+        }
+        finally { Field("download", null); Field("state", "idle"); Property("Available", null); Property("Busy", false); Property("Percent", 0); app.Manager!.Navigate("tasks"); }
         return checks;
     }
     private static void Render(Window window, string path, int width, int height)

@@ -19,7 +19,7 @@ internal sealed class MainWindow : Window
     private DispatcherTimer? undoTimer;
     private TextBlock? cloudStatus, cloudFooter;
     private TextBlock? updateStatus;
-    private Button? updateCheck, updateLink;
+    private Button? updateCheck, updateLink, updateInstall, updateCancel, bannerInstall, bannerCancel;
     private Border updateBanner = null!;
     internal MainWindow()
     {
@@ -52,7 +52,7 @@ internal sealed class MainWindow : Window
     private void Build()
     {
         cloudStatus = null;
-        updateStatus = null; updateCheck = updateLink = null;
+        updateStatus = null; updateCheck = updateLink = updateInstall = updateCancel = null;
         Title = "QuestBell · " + L.T("Small quests. Lighter days.", "Μικρές αποστολές. Πιο ανάλαφρες μέρες.");
         Language = System.Windows.Markup.XmlLanguage.GetLanguage(L.Culture.IetfLanguageTag);
         shell = new Grid { Background = Ui.Brush("#0D121B") }; shell.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) }); shell.ColumnDefinitions.Add(new ColumnDefinition());
@@ -83,7 +83,9 @@ internal sealed class MainWindow : Window
         string title = page switch { "history" => L.T("A little progress, recorded.", "Η πρόοδός σου, καταγραμμένη."), "collection" => L.T("Your cabinet of little wonders.", "Το ντουλάπι των μικρών θαυμάτων."), "settings" => L.T("Make yourself at home.", "Κάν’ το στα μέτρα σου."), _ => L.T("Hello, quest keeper.", "Γεια σου, φύλακα αποστολών.") };
         var h = Ui.Col(Ui.Eyebrow(DateTime.Now.ToString("dddd, d MMMM", L.Culture)), Ui.Text(title, 26, null, true)); header.Children.Add(h);
         DockPanel.SetDock(header, Dock.Top); content.Children.Add(header);
-        updateBanner = Ui.Card(Ui.Row(Ui.Text(Host.Updates.Status, 14, Ui.Mint, true), Ui.Button(L.T("View update ↗", "Προβολή ενημέρωσης ↗"), OpenUpdate)), padding: 12);
+        var updateActions = new WrapPanel();
+        foreach (var action in new[] { bannerInstall = Ui.Button(L.T("Update now", "Ενημέρωση τώρα"), () => { _ = Host.Updates.Install(); }, true), bannerCancel = Ui.Button(L.T("Cancel download", "Ακύρωση λήψης"), Host.Updates.CancelDownload), Ui.Button(L.T("Release notes ↗", "Σημειώσεις έκδοσης ↗"), OpenUpdate) }) updateActions.Children.Add(action);
+        updateBanner = Ui.Card(Ui.Col(Ui.Text(Host.Updates.Status, 14, Ui.Mint, true), updateActions), padding: 12);
         DockPanel.SetDock(updateBanner, Dock.Top); content.Children.Add(updateBanner);
         RefreshUpdates();
         toast = new Border { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 10, 0, 4), Background = Ui.Brush("#25473E"), Padding = new Thickness(14), CornerRadius = new CornerRadius(10) };
@@ -96,7 +98,8 @@ internal sealed class MainWindow : Window
     {
         if (updateStatus is not null) updateStatus.Text = Host.Updates.Status;
         if (updateCheck is not null) updateCheck.IsEnabled = !Host.Updates.Busy;
-        if (updateLink is not null) updateLink.Content = Host.Updates.Available is null ? L.T("GitHub releases ↗", "Εκδόσεις στο GitHub ↗") : L.T("View update / download ↗", "Ενημέρωση / λήψη ↗");
+        foreach (var button in new[] { updateInstall, bannerInstall }) if (button is not null) { button.Visibility = Host.Updates.Available?.CanInstall == true ? Visibility.Visible : Visibility.Collapsed; button.IsEnabled = !Host.Updates.Busy; }
+        foreach (var button in new[] { updateCancel, bannerCancel }) if (button is not null) { button.Visibility = Host.Updates.Downloading ? Visibility.Visible : Visibility.Collapsed; button.IsEnabled = Host.Updates.Downloading; }
         if (updateBanner is not null)
         {
             updateBanner.Visibility = Host.Updates.Available is null ? Visibility.Collapsed : Visibility.Visible;
@@ -279,8 +282,9 @@ internal sealed class MainWindow : Window
             Ui.Text(L.T("Installed version: ", "Εγκατεστημένη έκδοση: ") + UpdateService.Installed.ToString(3), 14, Ui.Muted),
             Toggle("Check GitHub automatically once a day", "Αυτόματος έλεγχος στο GitHub μία φορά την ημέρα", preferences.CheckUpdates, v => preferences.CheckUpdates = v),
             updateStatus = Ui.Text(Host.Updates.Status, 14, Ui.Mint),
-            Ui.Row(updateCheck = Ui.Button(L.T("Check for updates", "Έλεγχος ενημερώσεων"), () => { _ = Host.Updates.Check(); }), updateLink = Ui.Button(L.T("GitHub releases ↗", "Εκδόσεις στο GitHub ↗"), OpenUpdate)),
-            Ui.Text(L.T("Checks published stable releases from sidosgr/QuestBell. Updates appear quietly here; open the release page to download and run its installer when ready. Checks send no reminder data. You control installation.", "Ελέγχει δημοσιευμένες σταθερές εκδόσεις από το sidosgr/QuestBell. Οι ενημερώσεις εμφανίζονται διακριτικά εδώ· άνοιξε τη σελίδα έκδοσης για λήψη και εκτέλεση εγκατάστασης όταν θέλεις. Δεν αποστέλλονται δεδομένα υπενθυμίσεων. Εσύ ελέγχεις την εγκατάσταση."), 13, Ui.Muted))));
+            Ui.Row(updateCheck = Ui.Button(L.T("Check for updates", "Έλεγχος ενημερώσεων"), () => { _ = Host.Updates.Check(); }), updateInstall = Ui.Button(L.T("Update now", "Ενημέρωση τώρα"), () => { _ = Host.Updates.Install(); }, true), updateCancel = Ui.Button(L.T("Cancel download", "Ακύρωση λήψης"), Host.Updates.CancelDownload)),
+            updateLink = Ui.Button(L.T("GitHub releases / notes ↗", "Εκδόσεις / σημειώσεις στο GitHub ↗"), OpenUpdate),
+            Ui.Text(L.T("Click Update now to download, verify and install the latest stable GitHub release. QuestBell closes briefly and reopens; reminders and settings are kept. Cancel is available during download. Checks send no reminder data. Installation starts only when you choose it.", "Πάτησε Ενημέρωση τώρα για λήψη, επαλήθευση και εγκατάσταση της τελευταίας σταθερής έκδοσης από το GitHub. Το QuestBell κλείνει για λίγο και ανοίγει ξανά· οι υπενθυμίσεις και ρυθμίσεις διατηρούνται. Η λήψη μπορεί να ακυρωθεί. Δεν αποστέλλονται υπενθυμίσεις. Η εγκατάσταση ξεκινά μόνο όταν την επιλέξεις."), 13, Ui.Muted))));
         RefreshUpdates();
         body.Children.Add(Ui.Text("QuestBell " + typeof(App).Assembly.GetName().Version!.ToString(3) + " · Windows x64 · " + L.T("Built for a lighter day.", "Για μια πιο ανάλαφρη μέρα."), 12, Ui.Muted));
     }
