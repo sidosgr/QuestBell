@@ -26,7 +26,7 @@ internal static class RenderTests
                 int artworkChecks = CheckArtwork(path);
                 int cloudChecks = await CloudServiceTests.Run(app);
                 app.Manager = new MainWindow();
-                int themeChecks = 0, menuChecks = 0, composerChecks = 0, workChecks = 0;
+                int themeChecks = 0, menuChecks = 0, composerChecks = 0, workChecks = 0, quickChecks = 0;
                 void CheckWindow(Window window, double preferredWidth, double preferredHeight)
                 {
                     if (window.Background is not SolidColorBrush brush || brush.Color != Ui.Brush("#0D121B").Color || window.FontSize != 14)
@@ -47,6 +47,7 @@ internal static class RenderTests
                     artworkChecks += CheckComposerArtwork(lang);
                     composerChecks += CheckSimpleComposer(app, lang, path);
                     workChecks += CheckWorkComposer(app, lang, path);
+                    quickChecks += CheckQuickChoices(app, lang, path);
                     menuChecks += MenuRenderTests.Run(app.Manager, r, path, lang);
                     app.Manager.Navigate("tasks"); Render(app.Manager, Path.Combine(path, "dashboard-" + lang + ".png"), 1440, 940);
                     var composer = new ComposerWindow(r); CheckWindow(composer, 1100, 1000); Render(composer, Path.Combine(path, "composer-" + lang + ".png"), 1100, 960);
@@ -63,7 +64,7 @@ internal static class RenderTests
                 if (!app.Data.Undo(entry)) throw new Exception("Undo flow failed.");
                 await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 var process = System.Diagnostics.Process.GetCurrentProcess(); process.Refresh();
-                var report = new { Result = "PASS", Screenshots = 38, WorkChecks = workChecks, CloudChecks = cloudChecks, ComposerChecks = composerChecks, ArtworkChecks = artworkChecks, ArtworkCount = Artwork.Total, MenuLayoutAndContrastChecks = menuChecks, WindowThemeAndSizingChecks = themeChecks, Languages = new[] { "en", "el" }, PersistedReminders = loaded.Reminders.Count, WorkingSetMB = process.WorkingSet64 / 1048576.0, ManagedMB = GC.GetTotalMemory(false) / 1048576.0, Time = DateTime.Now };
+                var report = new { Result = "PASS", Screenshots = 42, QuickChoicesChecks = quickChecks, WorkChecks = workChecks, CloudChecks = cloudChecks, ComposerChecks = composerChecks, ArtworkChecks = artworkChecks, ArtworkCount = Artwork.Total, MenuLayoutAndContrastChecks = menuChecks, WindowThemeAndSizingChecks = themeChecks, Languages = new[] { "en", "el" }, PersistedReminders = loaded.Reminders.Count, WorkingSetMB = process.WorkingSet64 / 1048576.0, ManagedMB = GC.GetTotalMemory(false) / 1048576.0, Time = DateTime.Now };
                 File.WriteAllText(Path.Combine(app.Storage.DirectoryPath, "smoke-report.json"), JsonSerializer.Serialize(report, Store.Json));
                 app.Shutdown(0);
             }
@@ -241,6 +242,65 @@ internal static class RenderTests
             Check(customWork.IsWork && customWork.CustomTitle && customWork.WorkTemplateId == "" && Catalog.Title(customWork, language) == "My custom work task", "custom work text stays custom after reload");
         }
         finally { app.Data = previous; app.Storage.Save(previous); }
+        return checks;
+    }
+    private static int CheckQuickChoices(App app, string language, string path)
+    {
+        IEnumerable<DependencyObject> Walk(DependencyObject node)
+        {
+            yield return node;
+            foreach (var child in LogicalTreeHelper.GetChildren(node).OfType<DependencyObject>()) foreach (var nested in Walk(child)) yield return nested;
+        }
+        T Named<T>(Window window, string name) where T : FrameworkElement => Walk(window).OfType<T>().Single(c => c.Name == name);
+        T Field<T>(ComposerWindow window, string name) => (T)typeof(ComposerWindow).GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(window)!;
+        void Click(Window window, string label) => Walk(window).OfType<Button>().Single(b => b.Content?.ToString() == label).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        void Next(ComposerWindow window) => Field<Button>(window, "next").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        int checks = 0; void Check(bool value, string description) { if (!value) throw new Exception("Quick choices: " + description + "/" + language); checks++; }
+        var previous = app.Data;
+        try
+        {
+            app.Data = new AppData(); app.Data.Settings.Language = language;
+            var settings = new QuickSettingsWindow();
+            Click(settings, L.T("Add quick reminder", "Προσθήκη γρήγορης υπενθύμισης"));
+            Check(app.Data.Settings.QuickReminders.Count == 0, "empty quick reminder is not added");
+            Named<TextBox>(settings, "QuickReminderTitle").Text = "Email project team / Ομάδα έργου";
+            Named<ComboBox>(settings, "QuickReminderMode").SelectedIndex = 1;
+            Named<ComboBox>(settings, "QuickReminderRepeat").SelectedIndex = 2;
+            Click(settings, L.T("Add quick reminder", "Προσθήκη γρήγορης υπενθύμισης"));
+            Check(app.Storage.Load().Settings.QuickReminders.Single().Work && app.Storage.Load().Settings.QuickReminders.Single().Repeat == "weekly", "settings addition persists work mode and repeat");
+            Named<TextBox>(settings, "QuickTimeClock").Text = "08:35";
+            Click(settings, L.T("Add time button", "Προσθήκη κουμπιού ώρας"));
+            Check(app.Storage.Load().Settings.QuickTimes.Any(t => t.Kind == "clock" && t.Value == 515), "custom clock button persists");
+            Click(settings, L.T("Add time button", "Προσθήκη κουμπιού ώρας"));
+            Check(app.Data.Settings.QuickTimes.Count == 8, "duplicate time button rejected");
+            Named<ComboBox>(settings, "QuickTimeKind").SelectedIndex = 1; Named<TextBox>(settings, "QuickTimeValue").Text = "20";
+            Click(settings, L.T("Add time button", "Προσθήκη κουμπιού ώρας"));
+            Check(app.Data.Settings.QuickTimes.Count == 9, "relative quick button added");
+            Render(settings, Path.Combine(path, "quick-settings-" + language + ".png"), 1000, 1550);
+            var composer = new ComposerWindow(); Named<ComboBox>(composer, "UserQuickReminders").SelectedIndex = 1;
+            Check(Field<TextBlock>(composer, "previewTitle").Text.StartsWith("Email project team") && Field<ComboBox>(composer, "mode").SelectedIndex == 1 && Field<ComboBox>(composer, "repeat").SelectedIndex == 2, "custom quick reminder fills the wizard");
+            Next(composer);
+            Field<DatePicker>(composer, "date").SelectedDate = DateTime.Today.AddDays(5);
+            Click(composer, "08:35");
+            Check(Field<DatePicker>(composer, "date").SelectedDate == DateTime.Today.AddDays(5) && Field<ComboBox>(composer, "hour").Text == "08" && Field<ComboBox>(composer, "minute").Text == "35", "clock button preserves selected date");
+            var delay = app.Data.Settings.QuickTimes.Single(t => t.Kind == "delay");
+            var before = DateTime.Now.AddMinutes(20); Click(composer, QuickSettingsWindow.TimeLabel(delay));
+            var applied = Field<DatePicker>(composer, "date").SelectedDate!.Value.AddHours(int.Parse(Field<ComboBox>(composer, "hour").Text)).AddMinutes(int.Parse(Field<ComboBox>(composer, "minute").Text));
+            Check(Math.Abs((applied - before).TotalSeconds) < 61, "relative button uses current time");
+            Walk(composer).OfType<Expander>().Single(e => e.Header?.ToString() == L.T("More timing choices", "Περισσότερες επιλογές ώρας")).IsExpanded = true;
+            Render(composer, Path.Combine(path, "quick-times-" + language + ".png"), 1000, 1000);
+            composer.Opacity = 0; composer.ShowActivated = false; composer.ShowInTaskbar = false;
+            Exception? failure = null;
+            composer.Loaded += (_, _) => { try { Next(composer); Field<Button>(composer, "save").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Check(composer.DialogResult == true, "quick reminder creates a real reminder"); } catch (Exception e) { failure = e; } finally { if (composer.IsVisible) composer.Close(); } };
+            composer.ShowDialog(); if (failure is not null) throw failure;
+            Click(settings, L.T("Remove", "Αφαίρεση"));
+            Check(app.Storage.Load().Settings.QuickReminders.Count == 0 && app.Storage.Load().Reminders.Count == 1, "removing a quick reminder keeps created reminders");
+            Click(settings, "08:35  ×");
+            Check(app.Storage.Load().Settings.QuickTimes.All(t => t.Kind != "clock" || t.Value != 515), "removing a time button persists");
+            Click(settings, L.T("Restore default time buttons", "Επαναφορά προεπιλεγμένων κουμπιών ώρας"));
+            Check(app.Storage.Load().Settings.QuickTimes.Count == 7 && app.Storage.Load().Reminders.Count == 1, "default reset keeps real reminders");
+        }
+        finally { app.CloseReminder(); app.Data = previous; app.Storage.Save(previous); }
         return checks;
     }
     private static int CheckArtwork(string path)

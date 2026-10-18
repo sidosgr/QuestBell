@@ -52,6 +52,8 @@ public sealed class HistoryEntry
 
 public sealed class Preferences
 {
+    public List<QuickReminder> QuickReminders { get; set; } = [];
+    public List<QuickTime> QuickTimes { get; set; } = QuickOptions.DefaultTimes();
     public bool CheckUpdates { get; set; } = true;
     public bool WorkMode { get; set; }
     public string Language { get; set; } = "en";
@@ -113,6 +115,7 @@ public sealed class AppData
 
     public void Validate()
     {
+        if (Settings is not null) QuickOptions.Validate(Settings);
         if (SchemaVersion != 1) throw new InvalidDataException("Unsupported backup version.");
         if (Reminders is null || Settings is null || History is null || CustomPhrases is null || RecentTemplates is null)
             throw new InvalidDataException("Incomplete backup.");

@@ -1,5 +1,12 @@
 # Changes
 
+## 1.4.0
+
+- Added Settings → Your quick choices to add/remove reusable custom reminders with Personal/Work mode, an artwork family and a default repeat. They appear in step 1 of the reminder wizard; created reminders remain independent of their shortcut.
+- Added customizable quick date, clock-time and relative-delay buttons. Users can remove any default, add new choices or restore default time buttons. Removing all buttons keeps the normal date/time controls available.
+- Quick choices save immediately, remain local to each PC and are included in backup/restore. Older saved data receives the existing default buttons automatically.
+- Added English/Greek settings, validation, persistence, actual add/remove/create tests and updated guide instructions.
+
 ## 1.3.1
 
 - Added a GitHub update checker targeting sidosgr/QuestBell stable releases, with numeric version comparison and handling for no public release, network failure and rate limits.

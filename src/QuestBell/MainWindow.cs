@@ -251,6 +251,9 @@ internal sealed class MainWindow : Window
         body.Children.Add(Ui.Card(Ui.Col(Ui.Eyebrow(L.T("WORK MODE", "ΛΕΙΤΟΥΡΓΙΑ ΕΡΓΑΣΙΑΣ")),
             Toggle("Start new reminders in Work mode", "Νέες υπενθυμίσεις σε λειτουργία εργασίας", preferences.WorkMode, v => preferences.WorkMode = v),
             Ui.Text(L.T("26 templates for clients, orders, shipping, supplies and content. Switch Personal / Work in the reminder wizard at any time. All reminders still run normally.", "26 πρότυπα για πελάτες, παραγγελίες, αποστολές, προμήθειες και περιεχόμενο. Άλλαξε Προσωπικά / Εργασία στον οδηγό όποτε θέλεις. Όλες οι υπενθυμίσεις λειτουργούν κανονικά."), 13, Ui.Muted))));
+        body.Children.Add(Ui.Card(Ui.Col(Ui.Eyebrow(L.T("YOUR QUICK CHOICES", "ΟΙ ΓΡΗΓΟΡΕΣ ΕΠΙΛΟΓΕΣ ΣΟΥ")),
+            Ui.Text(L.T("Create reusable reminders and add or remove date, time and delay buttons in the reminder wizard.", "Δημιούργησε επαναχρησιμοποιήσιμες υπενθυμίσεις και πρόσθεσε ή αφαίρεσε κουμπιά ημερομηνίας, ώρας και διαστήματος στον οδηγό."), 13, Ui.Muted),
+            Ui.Button(L.T("Customize quick reminders & times…", "Προσαρμογή γρήγορων υπενθυμίσεων & ωρών…"), () => new QuickSettingsWindow { Owner = this }.ShowDialog()))));
         body.Children.Add(Ui.Card(Ui.Col(Ui.Eyebrow(L.T("QUIETLY IN THE BACKGROUND", "ΔΙΑΚΡΙΤΙΚΑ ΣΤΟ ΠΑΡΑΣΚΗΝΙΟ")),
             Toggle("Start with Windows", "Εκκίνηση με τα Windows", preferences.AutoStart, v => { preferences.AutoStart = v; Host.SyncStartup(); }),
             Toggle("Mute reminder sounds", "Σίγαση ήχων υπενθύμισης", preferences.Mute, v => preferences.Mute = v),

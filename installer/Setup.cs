@@ -14,8 +14,8 @@ using Microsoft.Win32;
 
 [assembly: AssemblyTitle("QuestBell Setup")]
 [assembly: AssemblyDescription("QuestBell offline per-user Windows installer")]
-[assembly: AssemblyVersion("1.3.1.0")]
-[assembly: AssemblyFileVersion("1.3.1.0")]
+[assembly: AssemblyVersion("1.4.0.0")]
+[assembly: AssemblyFileVersion("1.4.0.0")]
 
 internal static class Program
 {
@@ -158,7 +158,7 @@ internal static class Program
         {
             using (RegistryKey key = Registry.CurrentUser.CreateSubKey(context.UninstallRegistryPath))
             {
-                key.SetValue("DisplayName", "QuestBell"); key.SetValue("DisplayVersion", "1.3.1"); key.SetValue("Publisher", "QuestBell");
+                key.SetValue("DisplayName", "QuestBell"); key.SetValue("DisplayVersion", "1.4.0"); key.SetValue("Publisher", "QuestBell");
                 key.SetValue("InstallLocation", target); key.SetValue("DisplayIcon", Path.Combine(target, "QuestBell.exe"));
                 key.SetValue("UninstallString", "\"" + Path.Combine(target, "QuestBell.Uninstall.exe") + "\"");
                 key.SetValue("QuietUninstallString", "\"" + Path.Combine(target, "QuestBell.Uninstall.exe") + "\" /silent");

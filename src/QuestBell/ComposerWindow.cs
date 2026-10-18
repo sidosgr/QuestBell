@@ -63,6 +63,13 @@ internal sealed class ComposerWindow : Window
         bool initialWork = edit?.IsWork ?? (template is null && host.Data.Settings.WorkMode);
         mode = Ui.Combo(new[] { L.T("Personal", "Προσωπικά"), L.T("Work", "Εργασία") }, initialWork ? 1 : 0);
         fields.Children.Add(Ui.Field(L.T("Reminder mode", "Λειτουργία υπενθύμισης"), mode));
+        var quickReminders = host.Data.Settings.QuickReminders.ToArray();
+        var quick = Ui.Combo(new[] { L.T("Choose your own quick reminder…", "Διάλεξε δική σου γρήγορη υπενθύμιση…") }.Concat(quickReminders.Select(r => (r.Work ? L.T("Work · ", "Εργασία · ") : L.T("Personal · ", "Προσωπικά · ")) + r.Title)));
+        quick.Name = "UserQuickReminders";
+        quick.MaxDropDownHeight = 320;
+        var quickField = Ui.Field(L.T("YOUR QUICK REMINDERS", "ΟΙ ΓΡΗΓΟΡΕΣ ΥΠΕΝΘΥΜΙΣΕΙΣ ΣΟΥ"), quick);
+        quickField.Visibility = quickReminders.Length > 0 ? Visibility.Visible : Visibility.Collapsed; fields.Children.Add(quickField);
+        quick.SelectionChanged += (_, _) => { if (ready && quick.SelectedIndex > 0) ChooseQuick(quickReminders[quick.SelectedIndex - 1]); };
         var templates = new ComboBox();
         var sorted = Catalog.Templates.OrderBy(t => { int i = host.Data.RecentTemplates.IndexOf(t.Id); return i < 0 ? 999 : i; }).ToList();
         templates.Items.Add(L.T("Choose a ready-made reminder…", "Διάλεξε έτοιμη υπενθύμιση…"));
@@ -96,11 +103,10 @@ internal sealed class ComposerWindow : Window
         fields.Children.Add(Ui.Columns(Ui.Field(L.T("Reminder date", "Ημερομηνία υπενθύμισης"), date),
             Ui.Columns(Ui.Field(L.T("Time · 24 hour", "Ώρα · 24ωρη"), Ui.Row(hour, Ui.Text(":", 21, Ui.Muted), minute)), Ui.Field(L.T("Repeat", "Επανάληψη"), repeat), 1, 1.15), 1.3, 2));
         var dates = new WrapPanel();
-        void DateButton(string text, DateTime d) => dates.Children.Add(Ui.Button(text, () => date.SelectedDate = d));
-        DateButton(L.T("Today", "Σήμερα"), DateTime.Today); DateButton(L.T("Tomorrow", "Αύριο"), DateTime.Today.AddDays(1)); DateButton(L.T("Next week", "Σε μία εβδομάδα"), DateTime.Today.AddDays(7));
+        foreach (var time in host.Data.Settings.QuickTimes.Where(t => t.Kind == "date")) dates.Children.Add(Ui.Button(QuickSettingsWindow.TimeLabel(time), () => ApplyQuickTime(time)));
         fields.Children.Add(dates);
         var timePresets = new WrapPanel();
-        foreach (int h in new[] { 9, 12, 18, 20 }) { int hh = h; timePresets.Children.Add(Ui.Button(hh.ToString("00") + ":00", () => { hour.Text = hh.ToString("00"); minute.Text = "00"; })); }
+        foreach (var time in host.Data.Settings.QuickTimes.Where(t => t.Kind != "date")) timePresets.Children.Add(Ui.Button(QuickSettingsWindow.TimeLabel(time), () => ApplyQuickTime(time)));
         var delays = Catalog.Delays; var relative = Ui.Combo(delays.Select(L.Delay), 0, 195);
         var relativeRow = Ui.Row(relative, Ui.Button(L.T("Remind me in…", "Θύμισέ το σε…"), () => { var d = delays[relative.SelectedIndex]; SetTime(Schedule.Add(DateTime.Now, d.Value, d.Unit)); }));
         var customValue = new TextBox { Text = "1", Width = 80, MaxLength = 4 }; var units = new[] { "minutes", "hours", "days", "weeks", "months" }; var customUnit = Ui.Combo(units.Select(u => L.Unit(u, 2)), 1, 150);
@@ -262,6 +268,25 @@ internal sealed class ComposerWindow : Window
         category.SelectedIndex = Array.IndexOf(Catalog.CategoryIds, work.Category); categoryManual = true;
         repeat.SelectedIndex = Array.IndexOf(Schedule.Repeats, work.Repeat); interval.Text = "1"; after.IsChecked = false;
         variant.SelectedIndex = 0; artworkContext = ""; choosing = false; UpdateTitleMode(); Update();
+    }
+    private void ChooseQuick(QuickReminder quick)
+    {
+        choosing = true; workAuto = false; selectedTemplate = null;
+        title.Text = quick.Title; mode.SelectedIndex = quick.Work ? 1 : 0; custom.IsChecked = true; workReference.Text = "";
+        category.SelectedIndex = Array.IndexOf(Catalog.CategoryIds, quick.Category); categoryManual = true;
+        repeat.SelectedIndex = Array.IndexOf(Schedule.Repeats, quick.Repeat); interval.Text = "1"; after.IsChecked = false;
+        variant.SelectedIndex = 0; artworkContext = ""; choosing = false; UpdateTitleMode(); Update();
+    }
+    private void ApplyQuickTime(QuickTime time)
+    {
+        try
+        {
+            DateTime current = (date.SelectedDate ?? DateTime.Today).Date;
+            if (int.TryParse(hour.Text, out int h) && h is >= 0 and <= 23 && int.TryParse(minute.Text, out int m) && m is >= 0 and <= 59) current = current.AddHours(h).AddMinutes(m);
+            else current = current.Add(DateTime.Now.TimeOfDay);
+            SetTime(QuickOptions.Apply(time, current, DateTime.Now)); error.Text = "";
+        }
+        catch (Exception e) { error.Text = e.Message; }
     }
     private void Update()
     {

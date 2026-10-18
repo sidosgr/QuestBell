@@ -96,6 +96,7 @@ var athens = TimeZoneInfo.FindSystemTimeZoneById("GTB Standard Time");
 Check("DST spring gap normalized", !athens.IsInvalidTime(Schedule.Wall(new DateTime(2026, 3, 29, 3, 30, 0), athens)));
 CloudTests.Run(Check);
 UpdateTests.Run(Check);
+QuickTests.Run(Check);
 Check("26 unique work templates", WorkCatalog.Templates.Length == 26 && WorkCatalog.Templates.Select(t => t.Id).Distinct().Count() == 26);
 foreach (var work in WorkCatalog.Templates)
 {

@@ -66,6 +66,7 @@ public static class Artwork
                 ("work-newsletter", ["newsletter", "newsletters", "ενημερωτικο δελτιο"]),
                 ("work-blog", ["blog", "article", "manuscript", "αρθρ", "προσχεδιο"]),
                 ("work-social", ["social", "instagram", "facebook", "tiktok", "κοινωνικ"]),
+                ("work-email", ["email", "e-mail"]),
                 ("work-office", ["invoice", "supplies", "payment", "report", "review", "project", "τιμολογ", "προμηθει", "πληρωμ", "αναφορ", "εργο"]),
                 ("work-shipping", ["ship", "parcel", "order", "stock", "παραγγελι", "αποστολ", "δεμα", "αποθεμα"]),
                 ("work-email", ["email", "e-mail", "client", "supplier", "πελατ", "προμηθευτ"]) })

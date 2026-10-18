@@ -5,7 +5,7 @@ $taskTestRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('QuestBell-install-
 $taskInstallPath = Join-Path $taskTestRoot 'QuestBell'
 $taskDataPath = Join-Path $taskTestRoot 'data'
 New-Item -ItemType Directory -Force -Path $taskTestRoot | Out-Null
-$taskInstallerPath = Join-Path $taskRoot 'artifacts/QuestBell-Setup-1.3.1.exe'
+$taskInstallerPath = Join-Path $taskRoot 'artifacts/QuestBell-Setup-1.4.0.exe'
 $taskArguments = @('/silent','/no-register',('/dir="' + $taskInstallPath + '"'))
 $taskSetup = Start-Process -FilePath $taskInstallerPath -ArgumentList $taskArguments -PassThru -Wait -WindowStyle Hidden
 if ($taskSetup.ExitCode -ne 0) { throw 'Isolated installation failed. See %TEMP%/QuestBell-setup-error.txt.' }
