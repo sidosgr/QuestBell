@@ -20,7 +20,15 @@ public sealed class QuickTime
 public static class QuickOptions
 {
     public static List<QuickTime> DefaultTimes() => new[] { 0, 1, 7 }.Select(n => new QuickTime { Kind = "date", Value = n, Unit = "days" })
-        .Concat(new[] { 9, 12, 18, 20 }.Select(h => new QuickTime { Value = h * 60 })).ToList();
+        .Concat(new[] { 9, 12, 17, 21 }.Select(h => new QuickTime { Value = h * 60 })).ToList();
+    internal static void UpgradeDefaultTimes(Preferences preferences)
+    {
+        // Only upgrade the complete previous default set; preserve customized shortcuts and IDs.
+        var times = preferences.QuickTimes;
+        var previous = new[] { 0, 1, 7, 9 * 60, 12 * 60, 18 * 60, 20 * 60 };
+        if (times.Count != previous.Length || times.Where((t, i) => t.Kind != (i < 3 ? "date" : "clock") || t.Value != previous[i]).Any()) return;
+        times[5].Value = 17 * 60; times[6].Value = 21 * 60;
+    }
     public static void Validate(Preferences preferences)
     {
         var reminders = preferences.QuickReminders; var times = preferences.QuickTimes;

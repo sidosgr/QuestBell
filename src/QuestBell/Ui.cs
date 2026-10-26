@@ -67,7 +67,62 @@ internal static class Ui
     {
         var c = new ComboBox { Width = width }; foreach (var s in options) c.Items.Add(s); c.SelectedIndex = selected; return c;
     }
-    internal static FrameworkElement Field(string label, FrameworkElement control) => Col(Text(label, 12, Muted, true), control);
+    internal static Button Help(string label, string hint)
+    {
+        var tip = new ToolTip { Content = new TextBlock { Text = hint, TextWrapping = TextWrapping.Wrap, MaxWidth = 300 }, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+        var help = Button("?", () => tip.IsOpen = true);
+        help.Width = help.Height = 18; help.FontSize = 11; help.Padding = new Thickness(0);
+        help.Margin = new Thickness(6, 0, 0, 8); help.VerticalAlignment = VerticalAlignment.Top;
+        help.Background = Brushes.Transparent; help.Foreground = Muted; help.ToolTip = tip;
+        tip.PlacementTarget = help;
+        System.Windows.Automation.AutomationProperties.SetName(help, L.T("Help: ", "Βοήθεια: ") + label);
+        System.Windows.Automation.AutomationProperties.SetHelpText(help, hint);
+        ToolTipService.SetInitialShowDelay(help, 300); ToolTipService.SetShowDuration(help, 20000);
+        help.GotKeyboardFocus += (_, _) => tip.IsOpen = true;
+        help.LostKeyboardFocus += (_, _) => tip.IsOpen = false;
+        help.Unloaded += (_, _) => tip.IsOpen = false;
+        return help;
+    }
+    internal static FrameworkElement Label(string label, string hint) => Row(Text(label, 12, Muted, true), Help(label, hint));
+    internal static FrameworkElement Field(string label, FrameworkElement control, string? hint = null) => Col(hint is null ? Text(label, 12, Muted, true) : Label(label, hint), control);
+    internal static Grid TimingFields(DatePicker date, FrameworkElement time, IEnumerable<QuickTime> choices, Action<QuickTime> apply, FrameworkElement? repeat = null)
+    {
+        var dates = choices.Where(t => t.Kind == "date").ToArray();
+        var dateButtons = new Grid { Name = "DateQuickButtons", Margin = new Thickness(0, 0, 8, 0) };
+        int columns = Math.Min(3, dates.Length);
+        for (int i = 0; i < columns; i++)
+        {
+            if (i > 0) dateButtons.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) });
+            dateButtons.ColumnDefinitions.Add(new ColumnDefinition());
+        }
+        for (int i = 0; i < dates.Length; i++)
+        {
+            if (i % columns == 0) dateButtons.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var choice = dates[i]; var button = Button(QuickSettingsWindow.TimeLabel(choice), () => apply(choice));
+            button.Content = new TextBlock { Text = QuickSettingsWindow.TimeLabel(choice), TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center };
+            button.FontSize = 12; button.Padding = new Thickness(4, 10, 4, 10); button.Margin = new Thickness(0, 0, 0, 8);
+            Grid.SetColumn(button, i % columns * 2); Grid.SetRow(button, i / columns); dateButtons.Children.Add(button);
+        }
+        var clocks = new WrapPanel { Name = "ClockQuickButtons" };
+        foreach (var choice in choices.Where(t => t.Kind == "clock"))
+        {
+            var button = Button(QuickSettingsWindow.TimeLabel(choice), () => apply(choice));
+            button.Padding = new Thickness(10, 10, 10, 10); clocks.Children.Add(button);
+        }
+        var dateField = Col(Field(L.T("Reminder date", "Ημερομηνία υπενθύμισης"), date,
+            L.T("Choose a date or use a shortcut below. Date shortcuts keep the selected time; next week means seven days from today.", "Διάλεξε ημερομηνία ή συντόμευση παρακάτω. Οι συντομεύσεις διατηρούν την ώρα· η επόμενη εβδομάδα είναι επτά ημέρες από σήμερα.")), dateButtons);
+        var timeField = Col(Field(L.T("Time · 24 hour", "Ώρα · 24ωρη"), time,
+            L.T("Enter a time from 00:00 to 23:59, or pick a time below. Time shortcuts keep the selected date.", "Δώσε ώρα από 00:00 έως 23:59 ή διάλεξε παρακάτω. Οι συντομεύσεις ώρας διατηρούν την ημερομηνία.")), clocks);
+        if (repeat is null)
+        {
+            var snoozeGrid = Columns(dateField, timeField, 1, 2.4); snoozeGrid.Name = "TimingFields"; return snoozeGrid;
+        }
+        var grid = new Grid { Name = "TimingFields" };
+        for (int i = 0; i < 3; i++) grid.ColumnDefinitions.Add(new ColumnDefinition());
+        timeField.Name = "ReminderTimeSection"; timeField.HorizontalAlignment = HorizontalAlignment.Center;
+        Grid.SetColumn(timeField, 1); Grid.SetColumn(repeat, 2);
+        grid.Children.Add(dateField); grid.Children.Add(timeField); grid.Children.Add(repeat); return grid;
+    }
     internal static Grid Columns(FrameworkElement left, FrameworkElement right, double leftWeight = 1, double rightWeight = 1)
     {
         var g = new Grid(); g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(leftWeight, GridUnitType.Star) });

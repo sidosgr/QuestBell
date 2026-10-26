@@ -1,5 +1,14 @@
 # Changes
 
+## 1.5.1
+
+- Centered the sidebar tagline beneath the QuestBell branding in English and Greek.
+- Centered the reminder time section between Date and Repeat, aligned both relative-delay buttons on the left as Remind me in…, and added a centered OR label when more timing choices are expanded.
+- Made reminder and snooze date fields narrower than one third of the timing row, with equal date shortcuts spanning the input width and clock shortcuts directly below the time input.
+- Changed default clock shortcuts to 09:00, 12:00, 17:00 and 21:00. Existing unmodified defaults upgrade automatically; customized shortcut sets stay as configured.
+- Moved the relative-delay action to the left of its dropdown and added English/Greek help icons with hover, click and keyboard hints.
+- Widened the snooze dialog to keep date controls readable and fixed its initial date when the suggested time falls after midnight.
+
 ## 1.5.0
 
 - Added Update now in Settings and the update banner: download directly from GitHub, verify size and SHA-256, install, and reopen QuestBell.

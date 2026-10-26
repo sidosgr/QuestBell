@@ -9,6 +9,7 @@ internal static class QuickTests
         check("Legacy data receives default quick buttons", legacy.Settings.QuickTimes.Count == 7 && legacy.Settings.QuickReminders.Count == 0);
         var a = new Preferences(); var b = new Preferences(); a.QuickTimes.Clear();
         check("Quick button lists are independent per preferences instance", b.QuickTimes.Count == 7);
+        check("Default clock shortcuts use the requested times", b.QuickTimes.Where(t => t.Kind == "clock").Select(t => t.Value).SequenceEqual(new[] { 9 * 60, 12 * 60, 17 * 60, 21 * 60 }));
         var now = new DateTime(2026, 1, 31, 14, 25, 0); var selected = new DateTime(2026, 2, 10, 8, 45, 0);
         check("Clock button preserves selected date", QuickOptions.Apply(new QuickTime { Value = 9 * 60 + 30 }, selected, now) == new DateTime(2026, 2, 10, 9, 30, 0));
         check("Date button preserves entered time", QuickOptions.Apply(new QuickTime { Kind = "date", Value = 1 }, selected, now) == new DateTime(2026, 2, 1, 8, 45, 0));
@@ -21,6 +22,12 @@ internal static class QuickTests
         check("Quick choices survive backup round trip", copy.Settings.QuickReminders.Single().Title == "Έλεγξε τις παραγγελίες" && copy.Settings.QuickReminders.Single().Work && copy.Settings.QuickReminders.Single().Repeat == "weekly" && copy.Settings.QuickTimes.Count == 0);
         var folder = Path.Combine(Path.GetTempPath(), "QuestBell-quick-test-" + Guid.NewGuid().ToString("N")); var store = new Store(folder); store.Save(data);
         check("Quick choices survive disk reload", store.Load().Settings.QuickReminders.Count == 1 && store.Load().Settings.QuickTimes.Count == 0);
+        var oldDefaults = new AppData(); oldDefaults.Settings.QuickTimes[5].Value = 18 * 60; oldDefaults.Settings.QuickTimes[6].Value = 20 * 60;
+        var shortcutIds = oldDefaults.Settings.QuickTimes.Select(t => t.Id).ToArray(); store.Save(oldDefaults);
+        var upgraded = store.Load().Settings.QuickTimes;
+        check("Previous default clocks upgrade without changing shortcut IDs", upgraded[5].Value == 17 * 60 && upgraded[6].Value == 21 * 60 && upgraded.Select(t => t.Id).SequenceEqual(shortcutIds));
+        oldDefaults.Settings.QuickTimes.Add(new QuickTime { Value = 8 * 60 }); store.Save(oldDefaults);
+        check("Customized clock shortcuts remain unchanged", store.Load().Settings.QuickTimes[5].Value == 18 * 60 && store.Load().Settings.QuickTimes[6].Value == 20 * 60);
         check("Custom project email gets email artwork", Artwork.Topic(new Reminder { IsWork = true, CustomTitle = true, Title = "Email project team" }) == "work-email");
         bool Reject(Action action) { try { action(); return false; } catch (InvalidDataException) { return true; } }
         data.Settings.QuickTimes.Add(new QuickTime { Value = 1440 });

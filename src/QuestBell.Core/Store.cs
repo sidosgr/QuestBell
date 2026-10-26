@@ -33,6 +33,7 @@ public sealed class Store
         var data = JsonSerializer.Deserialize<AppData>(File.ReadAllText(path, Encoding.UTF8), Json)
                    ?? throw new InvalidDataException("Empty backup.");
         data.Validate();
+        QuickOptions.UpgradeDefaultTimes(data.Settings);
         return data;
     }
 

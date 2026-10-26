@@ -60,7 +60,9 @@ internal sealed class MainWindow : Window
         var side = new DockPanel { Margin = new Thickness(18, 24, 14, 20) };
         var sidebar = new Border { Background = Ui.Brush("#101924"), BorderBrush = Ui.Brush("#243043"), BorderThickness = new Thickness(0, 0, 1, 0), Child = side };
         shell.Children.Add(sidebar);
-        var brand = Ui.Col(Ui.Text("✦  QuestBell", 25, Ui.Mint, true), Ui.Text(L.T("SMALL QUESTS. LIGHTER DAYS.", "ΜΙΚΡΕΣ ΑΠΟΣΤΟΛΕΣ. ΑΝΕΤΕΣ ΜΕΡΕΣ."), 9, Ui.Muted));
+        var tagline = Ui.Text(L.T("SMALL QUESTS. LIGHTER DAYS.", "ΜΙΚΡΕΣ ΑΠΟΣΤΟΛΕΣ. ΑΝΕΤΕΣ ΜΕΡΕΣ."), 9, Ui.Muted);
+        tagline.TextAlignment = TextAlignment.Center;
+        var brand = Ui.Col(Ui.Text("✦  QuestBell", 25, Ui.Mint, true), tagline);
         brand.Margin = new Thickness(8, 0, 0, 35); DockPanel.SetDock(brand, Dock.Top); side.Children.Add(brand);
         var footer = Ui.Col(Ui.Text(Host.Data.Settings.PausedUntil > DateTime.Now ? L.T("◌  Reminders paused", "◌  Υπενθυμίσεις σε παύση") : L.T("●  Quietly on your side", "●  Διακριτικά στο πλευρό σου"), 12, Ui.Mint),
             cloudFooter = Ui.Text("", 11, Ui.Muted), Ui.Button(L.T("Open the field guide ↗", "Άνοιγμα οδηγού ↗"), Host.OpenGuide));

@@ -1,6 +1,6 @@
 # Full-Screen Reminders — Product Specification
 
-Status: implemented as QuestBell 1.5.0. This document preserves the planning decisions; README.md and the bilingual HTML guide describe the delivered behavior. Source code, installer, reports and screenshots are in this workspace.
+Status: implemented as QuestBell 1.5.1. This document preserves the planning decisions; README.md and the bilingual HTML guide describe the delivered behavior. Source code, installer, reports and screenshots are in this workspace.
 
 ## Purpose
 

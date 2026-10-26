@@ -100,18 +100,19 @@ internal sealed class ComposerWindow : Window
         hour = Ui.Combo(Enumerable.Range(0, 24).Select(x => x.ToString("00")), initial.Hour, 77); hour.IsEditable = true;
         minute = Ui.Combo(Enumerable.Range(0, 60).Select(x => x.ToString("00")), initial.Minute, 77); minute.IsEditable = true;
         repeat = Ui.Combo(Schedule.Repeats.Select(L.Repeat), Math.Max(0, Array.IndexOf(Schedule.Repeats, edit?.Repeat ?? "none")));
-        fields.Children.Add(Ui.Columns(Ui.Field(L.T("Reminder date", "Ημερομηνία υπενθύμισης"), date),
-            Ui.Columns(Ui.Field(L.T("Time · 24 hour", "Ώρα · 24ωρη"), Ui.Row(hour, Ui.Text(":", 21, Ui.Muted), minute)), Ui.Field(L.T("Repeat", "Επανάληψη"), repeat), 1, 1.15), 1.3, 2));
-        var dates = new WrapPanel();
-        foreach (var time in host.Data.Settings.QuickTimes.Where(t => t.Kind == "date")) dates.Children.Add(Ui.Button(QuickSettingsWindow.TimeLabel(time), () => ApplyQuickTime(time)));
-        fields.Children.Add(dates);
-        var timePresets = new WrapPanel();
-        foreach (var time in host.Data.Settings.QuickTimes.Where(t => t.Kind != "date")) timePresets.Children.Add(Ui.Button(QuickSettingsWindow.TimeLabel(time), () => ApplyQuickTime(time)));
+        fields.Children.Add(Ui.TimingFields(date, Ui.Row(hour, Ui.Text(":", 21, Ui.Muted), minute), host.Data.Settings.QuickTimes, ApplyQuickTime,
+            Ui.Field(L.T("Repeat", "Επανάληψη"), repeat, L.T("Choose One time for a single reminder. For repeating reminders, use Repeat options to set the interval or weekdays.", "Διάλεξε Μία φορά για μία υπενθύμιση. Για επανάληψη, όρισε διάστημα ή ημέρες στις Επιλογές επανάληψης."))));
+        var delayPresets = new WrapPanel();
+        foreach (var time in host.Data.Settings.QuickTimes.Where(t => t.Kind == "delay")) delayPresets.Children.Add(Ui.Button(QuickSettingsWindow.TimeLabel(time), () => ApplyQuickTime(time)));
         var delays = Catalog.Delays; var relative = Ui.Combo(delays.Select(L.Delay), 0, 195);
-        var relativeRow = Ui.Row(relative, Ui.Button(L.T("Remind me in…", "Θύμισέ το σε…"), () => { var d = delays[relative.SelectedIndex]; SetTime(Schedule.Add(DateTime.Now, d.Value, d.Unit)); }));
+        var relativeRow = Ui.Row(Ui.Button(L.T("Remind me in…", "Θύμισέ το σε…"), () => { var d = delays[relative.SelectedIndex]; SetTime(Schedule.Add(DateTime.Now, d.Value, d.Unit)); }), relative,
+            Ui.Help(L.T("Remind me in…", "Θύμισέ το σε…"), L.T("Choose a delay on the right, then click the button to set the date and time from now.", "Διάλεξε διάστημα δεξιά και πάτησε το κουμπί για να ορίσεις ημερομηνία και ώρα από τώρα.")));
+        ((Button)relativeRow.Children[0]).Name = "RelativeDelayAction";
         var customValue = new TextBox { Text = "1", Width = 80, MaxLength = 4 }; var units = new[] { "minutes", "hours", "days", "weeks", "months" }; var customUnit = Ui.Combo(units.Select(u => L.Unit(u, 2)), 1, 150);
-        var customRelative = Ui.Row(customValue, customUnit, Ui.Button(L.T("Use custom interval", "Προσαρμοσμένο διάστημα"), () =>
-        { try { if (!int.TryParse(customValue.Text, out int n) || n < 1 || n > 1200) throw new ArgumentException(L.T("Choose a number from 1 to 1200.", "Διάλεξε αριθμό από 1 έως 1200.")); SetTime(Schedule.Add(DateTime.Now, n, units[customUnit.SelectedIndex])); } catch (Exception e) { if (error is not null) error.Text = e.Message; } }));
+        var customRelative = Ui.Row(Ui.Button(L.T("Remind me in…", "Θύμισέ το σε…"), () =>
+        { try { if (!int.TryParse(customValue.Text, out int n) || n < 1 || n > 1200) throw new ArgumentException(L.T("Choose a number from 1 to 1200.", "Διάλεξε αριθμό από 1 έως 1200.")); SetTime(Schedule.Add(DateTime.Now, n, units[customUnit.SelectedIndex])); } catch (Exception e) { if (error is not null) error.Text = e.Message; } }), customValue, customUnit,
+            Ui.Help(L.T("Custom interval", "Προσαρμοσμένο διάστημα"), L.T("Enter 1–1200 and choose a unit on the right. Click Remind me in… to set the reminder that far from now.", "Δώσε 1–1200 και διάλεξε μονάδα δεξιά. Πάτησε Θύμισέ το σε… για να ορίσεις την υπενθύμιση με αφετηρία τώρα.")));
+        ((Button)customRelative.Children[0]).Name = "CustomDelayAction";
         interval = new TextBox { Text = (edit?.Interval ?? 1).ToString(), MaxLength = 3, Width = 80, HorizontalAlignment = HorizontalAlignment.Left };
         var weekdayRow = new WrapPanel();
         foreach (var day in new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday })
@@ -136,8 +137,12 @@ internal sealed class ComposerWindow : Window
         var followValues = new[] { 60, 360, 1440, 10080 }; followDelay = Ui.Combo(new[] { L.T("Every hour", "Κάθε ώρα"), L.T("Every 6 hours", "Κάθε 6 ώρες"), L.T("Every day", "Κάθε ημέρα"), L.T("Every week", "Κάθε εβδομάδα") }, edit?.FollowUpMinutes > 0 ? Math.Max(0, Array.IndexOf(followValues, edit.FollowUpMinutes)) : 2);
         var artwork = Ui.Col(Ui.Columns(Ui.Field(L.T("Illustration family", "Οικογένεια εικόνας"), category), Ui.Field(L.T("Item or companion", "Αντικείμενο ή μικρή παρέα"), variant)), Ui.Text(L.T("Task matches appear first. Automatic rotates related items and pets without repeating the last one.", "Οι σχετικές εικόνες εμφανίζονται πρώτες. Η αυτόματη επιλογή εναλλάσσει σχετικά αντικείμενα και ζωάκια χωρίς άμεση επανάληψη."), 12, Ui.Muted), pin, sound, follow, followDelay);
         Border Section(string en, string el, UIElement content) => Ui.Card(Ui.Col(Ui.Eyebrow(L.T(en, el)), content), padding: 16);
-        fields.Children.Add(new Expander { Header = L.T("More timing choices", "Περισσότερες επιλογές ώρας"), Content = Ui.Col(timePresets, relativeRow, customRelative), Margin = new Thickness(0, 12, 0, 12) });
-        repeatOptions = new Expander { Header = L.T("Repeat options", "Επιλογές επανάληψης"), Content = Ui.Col(Ui.Field(L.T("Every X periods · 1–365", "Κάθε Χ περιόδους · 1–365"), interval), weekdayRow, after), IsExpanded = repeat.SelectedIndex == 5 };
+        var timingAlternative = Ui.Text(L.T("OR", "Ή"), 28, Ui.Muted, true);
+        timingAlternative.Name = "TimingAlternative"; timingAlternative.TextAlignment = TextAlignment.Center; timingAlternative.Margin = new Thickness(0, 8, 0, 18);
+        fields.Children.Add(new Expander { Header = L.T("More timing choices", "Περισσότερες επιλογές ώρας"), Content = Ui.Col(timingAlternative, delayPresets, relativeRow, customRelative), Margin = new Thickness(0, 12, 0, 12) });
+        repeatOptions = new Expander { Header = L.T("Repeat options", "Επιλογές επανάληψης"), Content = Ui.Col(Ui.Field(L.T("Every X periods · 1–365", "Κάθε Χ περιόδους · 1–365"), interval,
+            L.T("Uses the repeat unit above: 2 with Weekly means every two weeks. Selected weekdays uses the checked days instead.", "Χρησιμοποιεί τη μονάδα επανάληψης: 2 με Κάθε εβδομάδα σημαίνει κάθε δύο εβδομάδες. Οι Επιλεγμένες ημέρες χρησιμοποιούν τις ημέρες που επέλεξες.")), weekdayRow,
+            Ui.Row(after, Ui.Help(L.T("Repeat after completion", "Επανάληψη μετά την ολοκλήρωση"), L.T("Start the next interval when you mark the reminder Done. Otherwise, repeats stay tied to the original schedule.", "Το επόμενο διάστημα ξεκινά όταν πατήσεις Έγινε. Διαφορετικά, η επανάληψη ακολουθεί το αρχικό πρόγραμμα.")))), IsExpanded = repeat.SelectedIndex == 5 };
         fields.Children.Add(repeatOptions);
         fields = pages[2];
         reviewTime = Ui.Text("", 16, Ui.Mint);
@@ -387,7 +392,7 @@ internal sealed class SnoozeWindow : Window
     internal DateTime Until { get; private set; }
     internal SnoozeWindow()
     {
-        Title = L.T("A little later · QuestBell", "Λίγο αργότερα · QuestBell"); Width = 650; Height = 760; MinWidth = 500; MinHeight = 550; Ui.ApplyWindow(this);
+        Title = L.T("A little later · QuestBell", "Λίγο αργότερα · QuestBell"); Width = 850; Height = 760; MinWidth = 850; MinHeight = 550; Ui.ApplyWindow(this);
         var outer = new StackPanel { Margin = new Thickness(26) }; Content = new ScrollViewer { Content = outer };
         outer.Children.Add(Ui.Eyebrow(L.T("LET IT REST A LITTLE", "ΑΣ ΠΕΡΙΜΕΝΕΙ ΛΙΓΟ"))); outer.Children.Add(Ui.Text(L.T("When shall we return?", "Πότε να επιστρέψουμε;"), 27, null, true));
         foreach (var group in Catalog.Delays.GroupBy(x => x.Unit))
@@ -396,11 +401,18 @@ internal sealed class SnoozeWindow : Window
             foreach (var delay in group) wrap.Children.Add(Ui.Button(L.Delay(delay), () => Pick(Schedule.Add(DateTime.Now, delay.Value, delay.Unit))));
             outer.Children.Add(wrap);
         }
-        var customDate = new DatePicker { SelectedDate = DateTime.Today };
-        var customTime = new TextBox { Text = DateTime.Now.AddHours(1).ToString("HH:mm"), Width = 95 };
+        var initial = DateTime.Now.AddHours(1);
+        var customDate = new DatePicker { SelectedDate = initial.Date, Language = System.Windows.Markup.XmlLanguage.GetLanguage(L.Culture.Name) };
+        var customTime = new TextBox { Text = initial.ToString("HH:mm"), Width = 95, HorizontalAlignment = HorizontalAlignment.Left };
         var error = Ui.Text("", 12, Ui.Gold);
         outer.Children.Add(Ui.Text(L.T("Or choose a date and time", "Ή διάλεξε ημερομηνία και ώρα"), 14, Ui.Muted, true));
-        outer.Children.Add(Ui.Row(customDate, customTime));
+        outer.Children.Add(Ui.TimingFields(customDate, customTime, App.Instance.Data.Settings.QuickTimes, choice =>
+        {
+            if (!customDate.SelectedDate.HasValue || !TimeSpan.TryParse(customTime.Text, out var time) || time < TimeSpan.Zero || time >= TimeSpan.FromDays(1))
+            { error.Text = L.T("Use a valid date and HH:mm time.", "Δώσε έγκυρη ημερομηνία και ώρα ΩΩ:λλ."); return; }
+            var selected = QuickOptions.Apply(choice, customDate.SelectedDate.Value.Date + time, DateTime.Now);
+            customDate.SelectedDate = selected.Date; customTime.Text = selected.ToString("HH:mm"); error.Text = "";
+        }));
         outer.Children.Add(Ui.Button(L.T("Snooze until then", "Αναβολή έως τότε"), () =>
         {
             if (!customDate.SelectedDate.HasValue || !TimeSpan.TryParse(customTime.Text, out var time) || time < TimeSpan.Zero || time >= TimeSpan.FromDays(1)) { error.Text = L.T("Use a valid date and HH:mm time.", "Δώσε έγκυρη ημερομηνία και ώρα ΩΩ:λλ."); return; }
@@ -409,7 +421,8 @@ internal sealed class SnoozeWindow : Window
         }, true));
         var count = new TextBox { Text = "1", Width = 70 }; var units = new[] { "minutes", "hours", "days", "weeks", "months" }; var unit = Ui.Combo(units.Select(u => L.Unit(u, 2)), 1, 145);
         outer.Children.Add(Ui.Row(count, unit, Ui.Button(L.T("Custom delay", "Άλλο διάστημα"), () =>
-        { try { if (!int.TryParse(count.Text, out int n) || n < 1 || n > 1200) throw new ArgumentException(); Pick(Schedule.Add(DateTime.Now, n, units[unit.SelectedIndex])); } catch { error.Text = L.T("Choose a number from 1 to 1200.", "Διάλεξε αριθμό από 1 έως 1200."); } })));
+        { try { if (!int.TryParse(count.Text, out int n) || n < 1 || n > 1200) throw new ArgumentException(); Pick(Schedule.Add(DateTime.Now, n, units[unit.SelectedIndex])); } catch { error.Text = L.T("Choose a number from 1 to 1200.", "Διάλεξε αριθμό από 1 έως 1200."); } }),
+            Ui.Help(L.T("Custom delay", "Άλλο διάστημα"), L.T("Enter 1–1200 and choose a unit. Custom delay immediately snoozes the reminder for that long from now.", "Δώσε 1–1200 και διάλεξε μονάδα. Το Άλλο διάστημα αναβάλλει αμέσως την υπενθύμιση με αφετηρία τώρα."))));
         outer.Children.Add(error); outer.Children.Add(Ui.Button(L.T("Back", "Πίσω"), Close));
     }
     private void Pick(DateTime time) { Until = time; DialogResult = true; }

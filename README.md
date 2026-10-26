@@ -8,11 +8,11 @@ A Windows task-reminder app that works offline, with persistent full-screen remi
 
 QuestBell checks stable releases from **[sidosgr/QuestBell](https://github.com/sidosgr/QuestBell/releases)**. Open **Settings → App updates → Check for updates**. Automatic checks are enabled by default, run shortly after startup when at least 24 hours have passed, and can be turned off. A small in-app banner appears for a newer release. Click **Update now** in the banner or Settings to download the installer directly, verify its GitHub SHA-256 digest and size, then install and reopen QuestBell. **Cancel download** is available before installation. Your reminders, language and startup choice are preserved. Installation only starts on your click; no reminder data is uploaded. The GitHub release page remains available for notes. Update checks require internet access; reminders work offline. Versions before 1.5.0 need this installer once to gain the direct-update button; subsequent updates can be installed inside the app.
 
-An unpublished/private repository or one without a stable release shows **No public release is available yet**. Network errors and rate limits show a retry message. Drafts, prereleases and equal/older versions do not prompt an update. Direct installation requires a matching installer asset with a valid GitHub SHA-256 digest and size (maximum 512 MiB). Unverifiable or incomplete downloads are never run. Use release tags such as **v1.5.0** and attach the matching installer and checksum. See **[PUBLISHING.md](PUBLISHING.md)** for the release checklist.
+An unpublished/private repository or one without a stable release shows **No public release is available yet**. Network errors and rate limits show a retry message. Drafts, prereleases and equal/older versions do not prompt an update. Direct installation requires a matching installer asset with a valid GitHub SHA-256 digest and size (maximum 512 MiB). Unverifiable or incomplete downloads are never run. Use release tags such as **v1.5.1** and attach the matching installer and checksum. See **[PUBLISHING.md](PUBLISHING.md)** for the release checklist.
 
 ## Install and use
 
-Run **[QuestBell-Setup-1.5.0.exe](https://github.com/sidosgr/QuestBell/releases/latest)**. One installer includes the app, the .NET desktop runtime, artwork, sounds, the guide, Start-menu shortcuts, and an uninstaller. Installation is per-user and does not require administrator rights.
+Run **[QuestBell-Setup-1.5.1.exe](https://github.com/sidosgr/QuestBell/releases/latest)**. One installer includes the app, the .NET desktop runtime, artwork, sounds, the guide, Start-menu shortcuts, and an uninstaller. Installation is per-user and does not require administrator rights.
 
 - Target: **Windows 10 22H2 or Windows 11, x64**. Earlier Windows builds and 32-bit Windows are not supported by this package.
 - The build is unsigned. Windows may display an unknown-publisher/SmartScreen prompt.
@@ -86,7 +86,7 @@ Requires a .NET 10 SDK on Windows. No third-party app packages or separate insta
 ./build.ps1 -Dotnet 'C:/path/to/dotnet.exe'
 ```
 
-If the SDK is installed in `.tools/dotnet`, run `./build.ps1` directly. Output is `artifacts/QuestBell-Setup-1.5.0.exe`; `artifacts/SHA256.txt` records its checksum. The bundled toolchain folder is ignored by Git. The app is self-contained at runtime.
+If the SDK is installed in `.tools/dotnet`, run `./build.ps1` directly. Output is `artifacts/QuestBell-Setup-1.5.1.exe`; `artifacts/SHA256.txt` records its checksum. The bundled toolchain folder is ignored by Git. The app is self-contained at runtime.
 
 Code-native logo/audio sources: `scripts/create-assets.py` (Pillow needed only to regenerate the icon). Generated artwork and full production prompts: [ARTWORK.md](ARTWORK.md). All 25 transparent atlases live in `src/QuestBell/Assets`; runtime atlas cropping provides 100 illustrations without modifying the source PNGs.
 
@@ -107,4 +107,4 @@ Reports and screenshots are in `artifacts`. Validation is on the current Windows
 
 Το **QuestBell** θυμίζει λογαριασμούς, συνδρομές, ραντεβού και μικρές εργασίες με εντυπωσιακές εικόνες pixel art. Η υπενθύμιση μένει μέχρι **Έγινε** ή **Αναβολή**, ενώ σέβεται τις εφαρμογές πλήρους οθόνης. Λειτουργεί εκτός σύνδεσης, στην περιοχή ειδοποιήσεων, με ελάχιστη πληκτρολόγηση και προαιρετική επανάληψη.
 
-Εκτέλεσε το `artifacts/QuestBell-Setup-1.5.0.exe`. Διάλεξε **ΕΛ** στην εγκατάσταση ή **Ελληνικά** στις Ρυθμίσεις. Ο αναλυτικός εικονογραφημένος οδηγός ανοίγει μέσα από την εφαρμογή ή από το [docs/index.html](docs/index.html). Η εγκατάσταση περιλαμβάνει ό,τι χρειάζεται και δεν απαιτεί διαχειριστή. Τα δεδομένα μένουν τοπικά και διατηρούνται κατά την απεγκατάσταση.
+Εκτέλεσε το `artifacts/QuestBell-Setup-1.5.1.exe`. Διάλεξε **ΕΛ** στην εγκατάσταση ή **Ελληνικά** στις Ρυθμίσεις. Ο αναλυτικός εικονογραφημένος οδηγός ανοίγει μέσα από την εφαρμογή ή από το [docs/index.html](docs/index.html). Η εγκατάσταση περιλαμβάνει ό,τι χρειάζεται και δεν απαιτεί διαχειριστή. Τα δεδομένα μένουν τοπικά και διατηρούνται κατά την απεγκατάσταση.

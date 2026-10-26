@@ -20,9 +20,9 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $taskZip = Join-Path $PSScriptRoot 'artifacts/Payload.zip'
 if (Test-Path -LiteralPath $taskZip) { Remove-Item -LiteralPath $taskZip }
 [System.IO.Compression.ZipFile]::CreateFromDirectory((Join-Path $PSScriptRoot 'artifacts/publish'), $taskZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
-& $taskCsc /nologo /target:winexe /platform:anycpu /optimize+ ('/out:' + (Join-Path $PSScriptRoot 'artifacts/QuestBell-Setup-1.5.0.exe')) ('/win32manifest:' + (Join-Path $PSScriptRoot 'src/QuestBell/app.manifest')) ('/win32icon:' + (Join-Path $PSScriptRoot 'src/QuestBell/Assets/questbell.ico')) ('/resource:' + $taskZip + ',Payload.zip') ('/resource:' + (Join-Path $PSScriptRoot 'src/QuestBell/Assets/questbell.ico') + ',questbell.ico') ('/resource:' + (Join-Path $PSScriptRoot 'src/QuestBell/Assets/personal.png') + ',personal.png') @taskRefs @taskSetupSources
+& $taskCsc /nologo /target:winexe /platform:anycpu /optimize+ ('/out:' + (Join-Path $PSScriptRoot 'artifacts/QuestBell-Setup-1.5.1.exe')) ('/win32manifest:' + (Join-Path $PSScriptRoot 'src/QuestBell/app.manifest')) ('/win32icon:' + (Join-Path $PSScriptRoot 'src/QuestBell/Assets/questbell.ico')) ('/resource:' + $taskZip + ',Payload.zip') ('/resource:' + (Join-Path $PSScriptRoot 'src/QuestBell/Assets/questbell.ico') + ',questbell.ico') ('/resource:' + (Join-Path $PSScriptRoot 'src/QuestBell/Assets/personal.png') + ',personal.png') @taskRefs @taskSetupSources
 if ($LASTEXITCODE) { throw 'Installer build failed.' }
-$taskInstaller = Get-Item -LiteralPath 'artifacts/QuestBell-Setup-1.5.0.exe'
+$taskInstaller = Get-Item -LiteralPath 'artifacts/QuestBell-Setup-1.5.1.exe'
 $taskHash = (Get-FileHash -LiteralPath $taskInstaller.FullName -Algorithm SHA256).Hash
 Set-Content -LiteralPath 'artifacts/SHA256.txt' -Value "$taskHash  $($taskInstaller.Name)" -Encoding ascii
 Write-Output "Installer ready: $($taskInstaller.FullName) ($([Math]::Round($taskInstaller.Length / 1MB, 1)) MB)"

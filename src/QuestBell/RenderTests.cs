@@ -26,7 +26,7 @@ internal static class RenderTests
                 int artworkChecks = CheckArtwork(path);
                 int cloudChecks = await CloudServiceTests.Run(app); int updateChecks = 0;
                 app.Manager = new MainWindow();
-                int themeChecks = 0, menuChecks = 0, composerChecks = 0, workChecks = 0, quickChecks = 0;
+                int themeChecks = 0, menuChecks = 0, composerChecks = 0, workChecks = 0, quickChecks = 0, timingChecks = 0;
                 void CheckWindow(Window window, double preferredWidth, double preferredHeight)
                 {
                     if (window.Background is not SolidColorBrush brush || brush.Color != Ui.Brush("#0D121B").Color || window.FontSize != 14)
@@ -40,7 +40,7 @@ internal static class RenderTests
                     themeChecks++;
                 }
                 CheckWindow(app.Manager, 1440, 980);
-                var snooze = new SnoozeWindow(); CheckWindow(snooze, 650, 760);
+                var snooze = new SnoozeWindow(); CheckWindow(snooze, 850, 760);
                 foreach (var lang in new[] { "en", "el" })
                 {
                     L.Language = app.Data.Settings.Language = lang; updateChecks += CheckUpdateControls(app, lang, path);
@@ -48,6 +48,7 @@ internal static class RenderTests
                     composerChecks += CheckSimpleComposer(app, lang, path);
                     workChecks += CheckWorkComposer(app, lang, path);
                     quickChecks += CheckQuickChoices(app, lang, path);
+                    timingChecks += CheckTimingControls(app, lang, path);
                     menuChecks += MenuRenderTests.Run(app.Manager, r, path, lang);
                     app.Manager.Navigate("tasks"); Render(app.Manager, Path.Combine(path, "dashboard-" + lang + ".png"), 1440, 940);
                     var composer = new ComposerWindow(r); CheckWindow(composer, 1100, 1000); Render(composer, Path.Combine(path, "composer-" + lang + ".png"), 1100, 960);
@@ -64,7 +65,7 @@ internal static class RenderTests
                 if (!app.Data.Undo(entry)) throw new Exception("Undo flow failed.");
                 await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 var process = System.Diagnostics.Process.GetCurrentProcess(); process.Refresh();
-                var report = new { Result = "PASS", Screenshots = 46, UpdateChecks = updateChecks, QuickChoicesChecks = quickChecks, WorkChecks = workChecks, CloudChecks = cloudChecks, ComposerChecks = composerChecks, ArtworkChecks = artworkChecks, ArtworkCount = Artwork.Total, MenuLayoutAndContrastChecks = menuChecks, WindowThemeAndSizingChecks = themeChecks, Languages = new[] { "en", "el" }, PersistedReminders = loaded.Reminders.Count, WorkingSetMB = process.WorkingSet64 / 1048576.0, ManagedMB = GC.GetTotalMemory(false) / 1048576.0, Time = DateTime.Now };
+                var report = new { Result = "PASS", Screenshots = Directory.GetFiles(path, "*.png").Length, TimingChecks = timingChecks, UpdateChecks = updateChecks, QuickChoicesChecks = quickChecks, WorkChecks = workChecks, CloudChecks = cloudChecks, ComposerChecks = composerChecks, ArtworkChecks = artworkChecks, ArtworkCount = Artwork.Total, MenuLayoutAndContrastChecks = menuChecks, WindowThemeAndSizingChecks = themeChecks, Languages = new[] { "en", "el" }, PersistedReminders = loaded.Reminders.Count, WorkingSetMB = process.WorkingSet64 / 1048576.0, ManagedMB = GC.GetTotalMemory(false) / 1048576.0, Time = DateTime.Now };
                 File.WriteAllText(Path.Combine(app.Storage.DirectoryPath, "smoke-report.json"), JsonSerializer.Serialize(report, Store.Json));
                 app.Shutdown(0);
             }
@@ -301,6 +302,78 @@ internal static class RenderTests
             Check(app.Storage.Load().Settings.QuickTimes.Count == 7 && app.Storage.Load().Reminders.Count == 1, "default reset keeps real reminders");
         }
         finally { app.CloseReminder(); app.Data = previous; app.Storage.Save(previous); }
+        return checks;
+    }
+    private static int CheckTimingControls(App app, string language, string path)
+    {
+        IEnumerable<DependencyObject> Walk(DependencyObject node)
+        {
+            yield return node;
+            foreach (var child in LogicalTreeHelper.GetChildren(node).OfType<DependencyObject>()) foreach (var nested in Walk(child)) yield return nested;
+        }
+        T Named<T>(Window window, string name) where T : FrameworkElement => Walk(window).OfType<T>().Single(c => c.Name == name);
+        string Label(Button button) => button.Content is TextBlock text ? text.Text : button.Content?.ToString() ?? "";
+        void Click(Window window, string label) => Walk(window).OfType<Button>().Single(b => Label(b) == label).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        int checks = 0;
+        void Check(bool value, string description) { if (!value) throw new Exception("Timing: " + description + "/" + language); checks++; }
+        void Layout(Window window)
+        {
+            var fields = Named<Grid>(window, "TimingFields"); var date = Walk(fields).OfType<DatePicker>().Single();
+            var dates = Named<Grid>(window, "DateQuickButtons"); var clocks = Named<WrapPanel>(window, "ClockQuickButtons");
+            var buttons = dates.Children.OfType<Button>().ToArray();
+            Check(date.ActualWidth <= fields.ActualWidth / 3 + 1, "date uses at most one third of the timing row");
+            Check(Math.Abs(date.ActualWidth - dates.ActualWidth) < 1 && Math.Abs(date.TranslatePoint(new Point(), fields).X - dates.TranslatePoint(new Point(), fields).X) < 1, "date shortcuts align and span the input width");
+            Check(buttons.Length == 3 && buttons.Max(b => b.ActualWidth) - buttons.Min(b => b.ActualWidth) <= 1, "date shortcuts have equal widths");
+            Check(Math.Abs(buttons.Last().TranslatePoint(new Point(buttons.Last().ActualWidth, 0), dates).X - date.ActualWidth) < 1, "date shortcuts end at the input edge");
+            Check(clocks.Children.OfType<Button>().Select(Label).SequenceEqual(new[] { "09:00", "12:00", "17:00", "21:00" }), "all four clock shortcuts are visible");
+            var timeInput = Walk(fields).OfType<ComboBox>().FirstOrDefault() as FrameworkElement ?? Walk(fields).OfType<TextBox>().Single();
+            Check(clocks.TranslatePoint(new Point(), fields).Y >= timeInput.TranslatePoint(new Point(0, timeInput.ActualHeight), fields).Y, "clock shortcuts sit below the time input");
+            foreach (var help in Walk(window).OfType<Button>().Where(b => Label(b) == "?"))
+                Check(help.ToolTip is ToolTip tip && tip.Content is TextBlock text && text.Text.Length > 20 && System.Windows.Automation.AutomationProperties.GetHelpText(help) == text.Text, "help icon has a readable accessible hint");
+        }
+        var previous = app.Data;
+        try
+        {
+            app.Data = new AppData(); app.Data.Settings.Language = language;
+            var composer = new ComposerWindow(); Click(composer, L.T("Next →", "Επόμενο →"));
+            var timing = Walk(composer).OfType<Expander>().Single(e => e.Header?.ToString() == L.T("More timing choices", "Περισσότερες επιλογές ώρας")); timing.IsExpanded = true;
+            foreach (int width in new[] { 850, 1100 })
+            {
+                Render(composer, Path.Combine(path, $"timing-{width}-{language}.png"), width, 1000); Layout(composer);
+                var fields = Named<Grid>(composer, "TimingFields"); var timeSection = Named<StackPanel>(composer, "ReminderTimeSection");
+                Check(Math.Abs(timeSection.TranslatePoint(new Point(timeSection.ActualWidth / 2, 0), fields).X - fields.ActualWidth / 2) <= 1, "time section stays centered in the timing row");
+            }
+            var alternative = Named<TextBlock>(composer, "TimingAlternative");
+            Check(alternative.Text == L.T("OR", "Ή") && alternative.ActualHeight > 0 && Math.Abs(alternative.TranslatePoint(new Point(alternative.ActualWidth / 2, 0), timing).X - timing.ActualWidth / 2) <= 2, "expanded timing choices show a centered OR label");
+            var relative = Named<Button>(composer, "RelativeDelayAction");
+            var row = (StackPanel)relative.Parent; var dropdown = row.Children.OfType<ComboBox>().Single();
+            Check(relative.TranslatePoint(new Point(relative.ActualWidth, 0), row).X <= dropdown.TranslatePoint(new Point(), row).X, "relative action sits left of its dropdown");
+            dropdown.SelectedIndex = 0; var before = DateTime.Now.AddMinutes(Catalog.Delays[0].Value); relative.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var date = Walk(Named<Grid>(composer, "TimingFields")).OfType<DatePicker>().Single();
+            var timeInputs = Walk(Named<Grid>(composer, "TimingFields")).OfType<ComboBox>().ToArray();
+            var applied = date.SelectedDate!.Value.AddHours(int.Parse(timeInputs[0].Text)).AddMinutes(int.Parse(timeInputs[1].Text));
+            Check(Math.Abs((applied - before).TotalSeconds) < 61, "reordered delay controls still apply the chosen delay");
+            var custom = Named<Button>(composer, "CustomDelayAction"); var customRow = (StackPanel)custom.Parent;
+            Check(Label(custom) == L.T("Remind me in…", "Θύμισέ το σε…") && customRow.Children[0] == custom, "custom delay action uses the same label and sits on the left");
+            customRow.Children.OfType<TextBox>().Single().Text = "2"; before = DateTime.Now.AddHours(2); custom.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            applied = date.SelectedDate!.Value.AddHours(int.Parse(timeInputs[0].Text)).AddMinutes(int.Parse(timeInputs[1].Text));
+            Check(Math.Abs((applied - before).TotalSeconds) < 61, "custom delay still applies the entered interval");
+            var help = Walk(Named<Grid>(composer, "TimingFields")).OfType<Button>().First(b => Label(b) == "?");
+            help.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var tooltip = (ToolTip)help.ToolTip;
+            Check(tooltip.IsOpen && tooltip.PlacementTarget == help, "help opens beside its icon"); tooltip.IsOpen = false;
+            var snooze = new SnoozeWindow();
+            foreach (int width in new[] { 850, 1100 })
+            {
+                Render(snooze, Path.Combine(path, $"snooze-{width}-{language}.png"), width, 760); Layout(snooze);
+            }
+            var snoozeFields = Named<Grid>(snooze, "TimingFields"); var snoozeDate = Walk(snoozeFields).OfType<DatePicker>().Single(); var snoozeTime = Walk(snoozeFields).OfType<TextBox>().Single();
+            snoozeDate.SelectedDate = DateTime.Today.AddDays(4); Click(snooze, "21:00");
+            Check(snoozeDate.SelectedDate == DateTime.Today.AddDays(4) && snoozeTime.Text == "21:00", "snooze clock shortcut preserves the date");
+            Click(snooze, L.T("Tomorrow", "Αύριο"));
+            Check(snoozeDate.SelectedDate == DateTime.Today.AddDays(1) && snoozeTime.Text == "21:00", "snooze date shortcut preserves the time");
+        }
+        finally { app.Data = previous; }
         return checks;
     }
     private static int CheckArtwork(string path)
